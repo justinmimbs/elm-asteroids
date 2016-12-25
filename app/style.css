@@ -1,0 +1,7 @@
+polyline {
+  fill: none;
+  stroke: rgb(80, 80, 80);
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
