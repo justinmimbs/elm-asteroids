@@ -1,3 +1,7 @@
+svg {
+  background-color: rgb(245, 245, 245);
+}
+
 polyline {
   fill: none;
   stroke: rgb(80, 80, 80);

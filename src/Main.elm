@@ -1,10 +1,55 @@
 module Main exposing (main)
 
+import AnimationFrame
 import Html exposing (Html)
 import Html.Attributes
+import Keyboard
 import Math.Matrix4 as Matrix4 exposing (Mat4)
 import Math.Vector3 as Vector3 exposing (Vec3)
+
+
+-- project modules
+
 import Screen
+
+
+main : Program Never Model Msg
+main =
+    Html.program
+        { init = ( initialModel, Cmd.none )
+        , update = \msg model -> ( update msg model, Cmd.none )
+        , view = \{ player } -> view [ player ]
+        , subscriptions =
+            always
+                (Sub.batch
+                    [ Keyboard.downs (keyCodeToMsg True)
+                    , Keyboard.ups (keyCodeToMsg False)
+                    , AnimationFrame.diffs (always Tick)
+                    ]
+                )
+        }
+
+
+
+-- model
+
+
+type alias Model =
+    { player : Entity
+    , controls : Controls
+    }
+
+
+type alias Entity =
+    { polylines : List Polyline
+    , scale : Float
+    , position : Vec3
+    , rotation : Radians
+
+    -- movement
+    , velocity : Vec3
+    , rotationInertia : Radians
+    }
 
 
 type alias Polyline =
@@ -15,12 +60,144 @@ type alias Radians =
     Float
 
 
-type alias Object =
-    { polylines : List Polyline
-    , scale : Float
-    , rotation : Radians
-    , position : Vec3
+type alias Controls =
+    { left : Bool
+    , right : Bool
+    , forward : Bool
     }
+
+
+initialModel : Model
+initialModel =
+    { player =
+        { polylines = spaceship
+        , scale = 20
+        , position = vec3Zero
+        , rotation = 0
+        , velocity = vec3Zero
+        , rotationInertia = 0
+        }
+    , controls =
+        { left = False
+        , right = False
+        , forward = False
+        }
+    }
+
+
+
+-- update
+
+
+type Msg
+    = NoOp
+    | Input Control Bool
+    | Tick
+
+
+type Control
+    = Left
+    | Right
+    | Forward
+
+
+keyCodeToMsg : Bool -> Int -> Msg
+keyCodeToMsg state keyCode =
+    case keyCode of
+        -- left
+        37 ->
+            Input Left state
+
+        -- up
+        38 ->
+            Input Forward state
+
+        -- right
+        39 ->
+            Input Right state
+
+        _ ->
+            NoOp
+
+
+update : Msg -> Model -> Model
+update msg ({ player, controls } as model) =
+    case msg of
+        NoOp ->
+            model
+
+        Input control state ->
+            { model
+                | controls =
+                    (case control of
+                        Left ->
+                            { controls | left = state }
+
+                        Right ->
+                            { controls | right = state }
+
+                        Forward ->
+                            { controls | forward = state }
+                    )
+            }
+
+        Tick ->
+            { model
+                | player = updatePlayer controls player
+            }
+
+
+settings =
+    { thrustRadians = 0.03
+    , thrustDistance = 0.8
+    , positionFriction = 0.98
+    , rotationFriction = 0.8
+    }
+
+
+updatePlayer : Controls -> Entity -> Entity
+updatePlayer controls entity =
+    let
+        { thrustRadians, thrustDistance, positionFriction, rotationFriction } =
+            settings
+
+        rotationThrust =
+            case ( controls.left, controls.right ) of
+                ( True, False ) ->
+                    thrustRadians
+
+                ( False, True ) ->
+                    thrustRadians |> negate
+
+                _ ->
+                    0
+
+        rotationNext =
+            entity.rotation
+                + (entity.rotationInertia * rotationFriction)
+                + rotationThrust
+
+        positionThrust =
+            if controls.forward then
+                ( thrustDistance, rotationNext + pi / 2 ) |> fromPolar |> toVec3
+            else
+                vec3Zero
+
+        positionNext =
+            entity.position
+                |> Vector3.add (entity.velocity |> Vector3.scale positionFriction)
+                |> Vector3.add (positionThrust)
+    in
+        { entity
+            | position = positionNext
+            , rotation = rotationNext
+            , velocity = Vector3.sub positionNext entity.position
+            , rotationInertia = rotationNext - entity.rotation
+        }
+
+
+
+-- view
 
 
 spaceship : List Polyline
@@ -55,23 +232,7 @@ globalTransform =
         |> Matrix4.scale3 1 -1 1
 
 
-main : Html a
-main =
-    view
-        [ { polylines = spaceship
-          , scale = 20
-          , rotation = 0
-          , position = Vector3.vec3 0 0 0
-          }
-        ]
-
-
-toVec3 : ( Float, Float ) -> Vec3
-toVec3 ( x, y ) =
-    Vector3.vec3 x y 0
-
-
-view : List Object -> Html a
+view : List Entity -> Html a
 view objects =
     Html.div
         [ Html.Attributes.style
@@ -80,13 +241,13 @@ view objects =
             ]
         ]
         [ objects
-            |> List.concatMap (transformObject globalTransform)
+            |> List.concatMap (transformEntity globalTransform)
             |> Screen.render screenSize
         ]
 
 
-transformObject : Mat4 -> Object -> List Polyline
-transformObject parentTransform object =
+transformEntity : Mat4 -> Entity -> List Polyline
+transformEntity parentTransform object =
     let
         transform =
             Matrix4.identity
@@ -98,3 +259,13 @@ transformObject parentTransform object =
         List.map
             (List.map (Matrix4.transform transform))
             object.polylines
+
+
+toVec3 : ( Float, Float ) -> Vec3
+toVec3 ( x, y ) =
+    Vector3.vec3 x y 0
+
+
+vec3Zero : Vec3
+vec3Zero =
+    Vector3.vec3 0 0 0
