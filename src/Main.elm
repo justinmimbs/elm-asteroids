@@ -1,4 +1,4 @@
-module Main exposing (main)
+module Main exposing (main, view)
 
 import AnimationFrame
 import Html exposing (Html)
@@ -41,14 +41,22 @@ type alias Model =
 
 
 type alias Entity =
-    { polylines : List Polyline
-    , scale : Float
-    , position : Vec3
-    , rotation : Radians
+    Moving (Renderable {})
 
-    -- movement
-    , velocity : Vec3
-    , rotationInertia : Radians
+
+type alias Renderable a =
+    { a
+        | polylines : List Polyline
+        , scale : Float
+        , position : Vec3
+        , rotation : Radians
+    }
+
+
+type alias Moving a =
+    { a
+        | velocity : Vec3
+        , rotationInertia : Radians
     }
 
 
@@ -63,7 +71,7 @@ type alias Radians =
 type alias Controls =
     { left : Bool
     , right : Bool
-    , forward : Bool
+    , thrust : Bool
     }
 
 
@@ -80,7 +88,7 @@ initialModel =
     , controls =
         { left = False
         , right = False
-        , forward = False
+        , thrust = False
         }
     }
 
@@ -98,7 +106,7 @@ type Msg
 type Control
     = Left
     | Right
-    | Forward
+    | Thrust
 
 
 keyCodeToMsg : Bool -> Int -> Msg
@@ -110,7 +118,7 @@ keyCodeToMsg state keyCode =
 
         -- up
         38 ->
-            Input Forward state
+            Input Thrust state
 
         -- right
         39 ->
@@ -136,8 +144,8 @@ update msg ({ player, controls } as model) =
                         Right ->
                             { controls | right = state }
 
-                        Forward ->
-                            { controls | forward = state }
+                        Thrust ->
+                            { controls | thrust = state }
                     )
             }
 
@@ -178,7 +186,7 @@ updatePlayer controls entity =
                 + rotationThrust
 
         positionThrust =
-            if controls.forward then
+            if controls.thrust then
                 ( thrustDistance, rotationNext + pi / 2 ) |> fromPolar |> toVec3
             else
                 vec3Zero
@@ -232,7 +240,7 @@ globalTransform =
         |> Matrix4.scale3 1 -1 1
 
 
-view : List Entity -> Html a
+view : List (Renderable a) -> Html b
 view objects =
     Html.div
         [ Html.Attributes.style
@@ -241,13 +249,13 @@ view objects =
             ]
         ]
         [ objects
-            |> List.concatMap (transformEntity globalTransform)
+            |> List.concatMap (transformRenderable globalTransform)
             |> Screen.render screenSize
         ]
 
 
-transformEntity : Mat4 -> Entity -> List Polyline
-transformEntity parentTransform object =
+transformRenderable : Mat4 -> Renderable a -> List Polyline
+transformRenderable parentTransform object =
     let
         transform =
             Matrix4.identity
