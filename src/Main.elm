@@ -18,7 +18,7 @@ main =
     Html.program
         { init = ( initialModel, Cmd.none )
         , update = \msg model -> ( update msg model, Cmd.none )
-        , view = \{ player } -> view [ player ]
+        , view = \{ player, blasts } -> view (renderable player :: List.map renderable blasts)
         , subscriptions =
             always
                 (Sub.batch
@@ -35,19 +35,24 @@ main =
 
 
 type alias Model =
-    { player : Entity
+    { player : Player
+    , blaster : Maybe Int -- timeTilFire
+    , blasts : List Blast
     , controls : Controls
     }
 
 
-type alias Entity =
+type alias Player =
     Moving (Renderable {})
+
+
+type alias Blast =
+    Moving (Renderable { timeRemaining : Int })
 
 
 type alias Renderable a =
     { a
         | polylines : List Polyline
-        , scale : Float
         , position : Vec3
         , rotation : Radians
     }
@@ -72,6 +77,7 @@ type alias Controls =
     { left : Bool
     , right : Bool
     , thrust : Bool
+    , fire : Bool
     }
 
 
@@ -79,16 +85,18 @@ initialModel : Model
 initialModel =
     { player =
         { polylines = spaceship
-        , scale = 20
         , position = vec3Zero
         , rotation = 0
         , velocity = vec3Zero
         , rotationInertia = 0
         }
+    , blaster = Nothing
+    , blasts = []
     , controls =
         { left = False
         , right = False
         , thrust = False
+        , fire = False
         }
     }
 
@@ -107,6 +115,7 @@ type Control
     = Left
     | Right
     | Thrust
+    | Fire
 
 
 keyCodeToMsg : Bool -> Int -> Msg
@@ -124,12 +133,16 @@ keyCodeToMsg state keyCode =
         39 ->
             Input Right state
 
+        -- f
+        70 ->
+            Input Fire state
+
         _ ->
             NoOp
 
 
 update : Msg -> Model -> Model
-update msg ({ player, controls } as model) =
+update msg ({ controls } as model) =
     case msg of
         NoOp ->
             model
@@ -146,28 +159,93 @@ update msg ({ player, controls } as model) =
 
                         Thrust ->
                             { controls | thrust = state }
+
+                        Fire ->
+                            { controls | fire = state }
                     )
             }
 
         Tick ->
-            { model
-                | player = updatePlayer controls player
+            let
+                playerNext =
+                    model.player |> updatePlayer controls
+
+                blasterNext =
+                    model.blaster |> updateBlaster controls.fire
+
+                blastsNext =
+                    fireBlast playerNext blasterNext
+                        |> Maybe.map ((flip (::)) model.blasts)
+                        |> Maybe.withDefault model.blasts
+                        |> List.filterMap updateBlast
+            in
+                { model
+                    | player = playerNext
+                    , blaster = blasterNext
+                    , blasts = blastsNext
+                }
+
+
+fireBlast : Player -> Maybe Int -> Maybe Blast
+fireBlast player blaster =
+    if blaster == Just 0 then
+        let
+            length =
+                Vector3.length player.velocity + 10
+        in
+            Just
+                { polylines = [ [ vec3Zero, Vector3.vec3 0 length 0 ] ]
+                , position = player.position
+                , rotation = player.rotation
+                , velocity = ( length, player.rotation + pi / 2 ) |> fromPolar |> toVec3
+                , rotationInertia = 0
+                , timeRemaining = 1200 // (floor length)
+                }
+    else
+        Nothing
+
+
+updateBlast : Blast -> Maybe Blast
+updateBlast blast =
+    if blast.timeRemaining > 0 then
+        Just
+            { blast
+                | position = Vector3.add blast.position blast.velocity
+                , timeRemaining = blast.timeRemaining - 1
             }
+    else
+        Nothing
 
 
-settings =
+updateBlaster : Bool -> Maybe Int -> Maybe Int
+updateBlaster fire blaster =
+    if fire then
+        case blaster of
+            Nothing ->
+                Just 0
+
+            Just 0 ->
+                Just 10
+
+            Just n ->
+                Just (n - 1)
+    else
+        Nothing
+
+
+playerSettings =
     { thrustRadians = 0.03
-    , thrustDistance = 0.8
+    , thrustDistance = 0.55
     , positionFriction = 0.98
     , rotationFriction = 0.8
     }
 
 
-updatePlayer : Controls -> Entity -> Entity
+updatePlayer : Controls -> Player -> Player
 updatePlayer controls entity =
     let
         { thrustRadians, thrustDistance, positionFriction, rotationFriction } =
-            settings
+            playerSettings
 
         rotationThrust =
             case ( controls.left, controls.right ) of
@@ -222,7 +300,7 @@ spaceship =
       , ( -0.5, -1 )
       ]
     ]
-        |> List.map (List.map toVec3)
+        |> List.map (List.map (toVec3 >> Vector3.scale 18))
 
 
 screenSize : ( Float, Float )
@@ -261,12 +339,21 @@ transformRenderable parentTransform object =
             Matrix4.identity
                 |> Matrix4.translate object.position
                 |> Matrix4.rotate object.rotation Vector3.k
-                |> Matrix4.scale3 object.scale object.scale object.scale
                 |> Matrix4.mul parentTransform
     in
         List.map
             (List.map (Matrix4.transform transform))
             object.polylines
+
+
+{-| Strip extended fields. Refactor to remove this step!
+-}
+renderable : Renderable a -> Renderable {}
+renderable { polylines, position, rotation } =
+    { polylines = polylines
+    , position = position
+    , rotation = rotation
+    }
 
 
 toVec3 : ( Float, Float ) -> Vec3
