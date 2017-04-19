@@ -168,7 +168,7 @@ update msg ({ controls } as model) =
         Tick ->
             let
                 playerNext =
-                    model.player |> updatePlayer controls
+                    model.player |> updatePlayer controls |> wrapPosition
 
                 blasterNext =
                     model.blaster |> updateBlaster controls.fire
@@ -178,6 +178,7 @@ update msg ({ controls } as model) =
                         |> Maybe.map ((flip (::)) model.blasts)
                         |> Maybe.withDefault model.blasts
                         |> List.filterMap updateBlast
+                        |> List.map wrapPosition
             in
                 { model
                     | player = playerNext
@@ -306,6 +307,30 @@ spaceship =
 screenSize : ( Float, Float )
 screenSize =
     ( 1200, 900 )
+
+
+wrapPosition : Renderable a -> Renderable a
+wrapPosition object =
+    { object
+        | position = object.position |> (uncurry wrapVec3) screenSize
+    }
+
+
+wrapVec3 : Float -> Float -> Vec3 -> Vec3
+wrapVec3 xMax yMax vec =
+    Vector3.vec3
+        (floatModulo (Vector3.getX vec) xMax)
+        (floatModulo (Vector3.getY vec) yMax)
+        0
+
+
+floatModulo : Float -> Float -> Float
+floatModulo x y =
+    let
+        n =
+            x / y |> floor |> toFloat
+    in
+        x - n * y
 
 
 view : List (Renderable a) -> Html b
