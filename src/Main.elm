@@ -85,8 +85,8 @@ initialModel : Model
 initialModel =
     { player =
         { polylines = spaceship
-        , position = vec3Zero
-        , rotation = 0
+        , position = screenSize |> toVec3 |> Vector3.scale 0.5
+        , rotation = pi
         , velocity = vec3Zero
         , rotationInertia = 0
         }
@@ -250,10 +250,10 @@ updatePlayer controls entity =
         rotationThrust =
             case ( controls.left, controls.right ) of
                 ( True, False ) ->
-                    thrustRadians
+                    thrustRadians |> negate
 
                 ( False, True ) ->
-                    thrustRadians |> negate
+                    thrustRadians
 
                 _ ->
                     0
@@ -308,16 +308,6 @@ screenSize =
     ( 1200, 900 )
 
 
-globalTransform : Mat4
-globalTransform =
-    Matrix4.identity
-        |> Matrix4.translate3
-            (Tuple.first screenSize / 2)
-            (Tuple.second screenSize / 2)
-            0
-        |> Matrix4.scale3 1 -1 1
-
-
 view : List (Renderable a) -> Html b
 view objects =
     Html.div
@@ -327,19 +317,18 @@ view objects =
             ]
         ]
         [ objects
-            |> List.concatMap (transformRenderable globalTransform)
+            |> List.concatMap transformRenderable
             |> Screen.render screenSize
         ]
 
 
-transformRenderable : Mat4 -> Renderable a -> List Polyline
-transformRenderable parentTransform object =
+transformRenderable : Renderable a -> List Polyline
+transformRenderable object =
     let
         transform =
             Matrix4.identity
                 |> Matrix4.translate object.position
                 |> Matrix4.rotate object.rotation Vector3.k
-                |> Matrix4.mul parentTransform
     in
         List.map
             (List.map (Matrix4.transform transform))
