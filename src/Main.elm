@@ -1,4 +1,4 @@
-module Main exposing (main, view)
+module Main exposing (main, view, wrapPosition)
 
 import AnimationFrame
 import Html exposing (Html)
@@ -11,6 +11,7 @@ import Math.Vector3 as Vector3 exposing (Vec3)
 -- project modules
 
 import Screen
+import Types exposing (Radians, Polyline, Renderable, Moving)
 
 
 main : Program Never Model Msg
@@ -48,29 +49,6 @@ type alias Player =
 
 type alias Blast =
     Moving (Renderable { timeRemaining : Int })
-
-
-type alias Renderable a =
-    { a
-        | polylines : List Polyline
-        , position : Vec3
-        , rotation : Radians
-    }
-
-
-type alias Moving a =
-    { a
-        | velocity : Vec3
-        , rotationInertia : Radians
-    }
-
-
-type alias Polyline =
-    List Vec3
-
-
-type alias Radians =
-    Float
 
 
 type alias Controls =
