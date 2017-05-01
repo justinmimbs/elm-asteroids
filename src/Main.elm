@@ -6,6 +6,7 @@ import Html.Attributes
 import Keyboard
 import Math.Matrix4 as Matrix4 exposing (Mat4)
 import Math.Vector3 as Vector3 exposing (Vec3)
+import Time exposing (Time)
 
 
 -- project modules
@@ -25,7 +26,7 @@ main =
                 (Sub.batch
                     [ Keyboard.downs (keyCodeToMsg True)
                     , Keyboard.ups (keyCodeToMsg False)
-                    , AnimationFrame.diffs (always Tick)
+                    , AnimationFrame.diffs (Tick << Time.inSeconds)
                     ]
                 )
         }
@@ -37,7 +38,7 @@ main =
 
 type alias Model =
     { player : Player
-    , blaster : Maybe Int -- timeTilFire
+    , blaster : Blaster
     , blasts : List Blast
     , controls : Controls
     }
@@ -47,8 +48,14 @@ type alias Player =
     Moving (Renderable {})
 
 
+{-| Represents time until next fire.
+-}
+type alias Blaster =
+    Maybe Time
+
+
 type alias Blast =
-    Moving (Renderable { timeRemaining : Int })
+    Moving (Renderable { timeRemaining : Time })
 
 
 type alias Controls =
@@ -86,7 +93,7 @@ initialModel =
 type Msg
     = NoOp
     | Input Control Bool
-    | Tick
+    | Tick Time
 
 
 type Control
@@ -143,19 +150,20 @@ update msg ({ controls } as model) =
                     )
             }
 
-        Tick ->
+        Tick dt ->
             let
                 playerNext =
-                    model.player |> updatePlayer controls |> wrapPosition
+                    model.player |> updatePlayer dt controls |> wrapPosition
 
                 blasterNext =
-                    model.blaster |> updateBlaster controls.fire
+                    model.blaster |> updateBlaster dt controls.fire
 
                 blastsNext =
-                    fireBlast playerNext blasterNext
+                    blasterNext
+                        |> Maybe.andThen (fireBlast dt playerNext)
                         |> Maybe.map ((flip (::)) model.blasts)
                         |> Maybe.withDefault model.blasts
-                        |> List.filterMap updateBlast
+                        |> List.filterMap (updateBlast dt)
                         |> List.map wrapPosition
             in
                 { model
@@ -165,63 +173,65 @@ update msg ({ controls } as model) =
                 }
 
 
-fireBlast : Player -> Maybe Int -> Maybe Blast
-fireBlast player blaster =
-    if blaster == Just 0 then
+fireBlast : Time -> Player -> Time -> Maybe Blast
+fireBlast dt player timeTilFire =
+    if timeTilFire < 0.001 then
         let
-            length =
-                Vector3.length player.velocity + 10
+            -- px / second
+            speed =
+                Vector3.length player.velocity + 600
         in
             Just
-                { polylines = [ [ vec3Zero, Vector3.vec3 0 length 0 ] ]
+                { polylines = [ [ vec3Zero, Vector3.vec3 0 (speed * dt) 0 ] ]
                 , position = player.position
                 , rotation = player.rotation
-                , velocity = ( length, player.rotation + pi / 2 ) |> fromPolar |> toVec3
+                , velocity = ( speed, player.rotation + pi / 2 ) |> fromPolar |> toVec3
                 , rotationInertia = 0
-                , timeRemaining = 1200 // (floor length)
+                , timeRemaining = 1200 / speed
                 }
     else
         Nothing
 
 
-updateBlast : Blast -> Maybe Blast
-updateBlast blast =
+updateBlast : Time -> Blast -> Maybe Blast
+updateBlast dt blast =
     if blast.timeRemaining > 0 then
         Just
             { blast
-                | position = Vector3.add blast.position blast.velocity
-                , timeRemaining = blast.timeRemaining - 1
+                | position = blast.position |> Vector3.add (blast.velocity |> Vector3.scale dt)
+                , timeRemaining = blast.timeRemaining - dt
             }
     else
         Nothing
 
 
-updateBlaster : Bool -> Maybe Int -> Maybe Int
-updateBlaster fire blaster =
+updateBlaster : Time -> Bool -> Blaster -> Blaster
+updateBlaster dt fire blaster =
     if fire then
         case blaster of
             Nothing ->
                 Just 0
 
-            Just 0 ->
-                Just 10
-
-            Just n ->
-                Just (n - 1)
+            Just t ->
+                if t < 0.001 then
+                    -- 6 hz
+                    Just (1 / 6 - dt)
+                else
+                    Just (t - dt)
     else
         Nothing
 
 
 playerSettings =
-    { thrustRadians = 0.03
-    , thrustDistance = 0.55
+    { thrustRadians = 1.8 -- rad / second
+    , thrustDistance = 35 -- px / second
     , positionFriction = 0.98
     , rotationFriction = 0.8
     }
 
 
-updatePlayer : Controls -> Player -> Player
-updatePlayer controls entity =
+updatePlayer : Time -> Controls -> Player -> Player
+updatePlayer dt controls entity =
     let
         { thrustRadians, thrustDistance, positionFriction, rotationFriction } =
             playerSettings
@@ -229,35 +239,35 @@ updatePlayer controls entity =
         rotationThrust =
             case ( controls.left, controls.right ) of
                 ( True, False ) ->
-                    thrustRadians |> negate
+                    thrustRadians * dt |> negate
 
                 ( False, True ) ->
-                    thrustRadians
+                    thrustRadians * dt
 
                 _ ->
                     0
 
         rotationNext =
             entity.rotation
-                + (entity.rotationInertia * rotationFriction)
+                + (entity.rotationInertia * rotationFriction * dt)
                 + rotationThrust
 
         positionThrust =
             if controls.thrust then
-                ( thrustDistance, rotationNext + pi / 2 ) |> fromPolar |> toVec3
+                ( thrustDistance * dt, rotationNext + pi / 2 ) |> fromPolar |> toVec3
             else
                 vec3Zero
 
         positionNext =
             entity.position
-                |> Vector3.add (entity.velocity |> Vector3.scale positionFriction)
+                |> Vector3.add (entity.velocity |> Vector3.scale (positionFriction * dt))
                 |> Vector3.add (positionThrust)
     in
         { entity
             | position = positionNext
             , rotation = rotationNext
-            , velocity = Vector3.sub positionNext entity.position
-            , rotationInertia = rotationNext - entity.rotation
+            , velocity = Vector3.sub positionNext entity.position |> Vector3.scale (1 / dt)
+            , rotationInertia = (rotationNext - entity.rotation) / dt
         }
 
 
