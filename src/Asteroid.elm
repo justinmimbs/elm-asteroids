@@ -10,20 +10,24 @@ import Types exposing (Polyline, Renderable, Moving)
 
 
 type alias Asteroid =
-    Moving (Renderable {})
+    Moving (Renderable { radius : Float })
 
 
 
 -- field
 
 
-field : ( Float, Float ) -> Int -> Generator (List Asteroid)
-field ( width, height ) count =
+field : Float -> ( Float, Float ) -> Int -> Generator (List Asteroid)
+field noAsteroidRadius ( width, height ) count =
     Random.list
         count
         (Random.map2
             setPosition
-            (Random.pair (Random.float 0 width) (Random.float 0 height) |> Random.map toVec3)
+            (Random.pair (Random.float 0 width) (Random.float 0 height)
+                |> Random.map toVec3
+                |> Random.filter
+                    (Vector3.distanceSquared (( width / 2, height / 2 ) |> toVec3) >> ((<) (noAsteroidRadius ^ 2)))
+            )
             asteroid
         )
 
@@ -39,28 +43,33 @@ setPosition x a =
 
 asteroid : Generator Asteroid
 asteroid =
-    Random.map3
-        (\velocity rotationInertia polyline ->
-            { polylines = [ polyline ]
-            , position = vec3Zero
-            , rotation = 0
-            , velocity = velocity
-            , rotationInertia = rotationInertia
-            }
-        )
-        (Random.pair (Random.float -60 60) (Random.float -60 60) |> Random.map toVec3)
-        (Random.float -1 1)
-        shape
+    Random.float 30 60
+        |> Random.andThen
+            (\radius ->
+                Random.map3
+                    (\velocity rotationInertia polyline ->
+                        { radius = radius
+                        , polylines = [ polyline ]
+                        , position = vec3Zero
+                        , rotation = 0
+                        , velocity = velocity
+                        , rotationInertia = rotationInertia
+                        }
+                    )
+                    (Random.pair (Random.float 10 80) (Random.float 0 (pi * 2)) |> Random.map (fromPolar >> toVec3))
+                    (Random.float -1 1)
+                    (shape radius)
+            )
 
 
 
 -- shape
 
 
-shape : Generator Polyline
-shape =
-    Random.int 9 14
-        |> Random.andThen (\n -> Random.list n (Random.pair (Random.float 30 50) (Random.float 0.1 1)))
+shape : Float -> Generator Polyline
+shape radius =
+    Random.int (radius / 5 |> floor) (radius / 4 |> ceiling)
+        |> Random.andThen (\n -> Random.list n (Random.pair (Random.float (radius * 0.6) radius) (Random.float 0.1 1)))
         |> Random.map toShape
 
 
