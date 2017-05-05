@@ -10,6 +10,7 @@ import Time exposing (Time)
 -- project modules
 
 import Asteroid exposing (Asteroid)
+import Force
 import Main exposing (view, wrapPosition)
 
 
@@ -40,3 +41,4 @@ initField =
     Random.initialSeed 3780540833
         |> Random.step (Asteroid.field 200 ( 1200, 900 ) 10)
         |> Tuple.first
+        |> Force.separate
