@@ -10,15 +10,15 @@ import Types exposing (Polyline, Renderable, Moving)
 
 
 type alias Asteroid =
-    Moving (Renderable { radius : Float })
+    Renderable (Moving { radius : Float })
 
 
 
 -- field
 
 
-field : Float -> ( Float, Float ) -> Int -> Generator (List Asteroid)
-field noAsteroidRadius ( width, height ) count =
+field : ( Float, Float ) -> Float -> Int -> Generator (List Asteroid)
+field ( width, height ) exclusionRadius count =
     Random.list
         count
         (Random.map2
@@ -26,7 +26,7 @@ field noAsteroidRadius ( width, height ) count =
             (Random.pair (Random.float 0 width) (Random.float 0 height)
                 |> Random.map toVec3
                 |> Random.filter
-                    (Vector3.distanceSquared (( width / 2, height / 2 ) |> toVec3) >> ((<) (noAsteroidRadius ^ 2)))
+                    (Vector3.distanceSquared (( width / 2, height / 2 ) |> toVec3) >> ((<) (exclusionRadius ^ 2)))
             )
             asteroid
         )

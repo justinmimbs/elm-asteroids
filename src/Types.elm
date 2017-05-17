@@ -1,6 +1,7 @@
-module Types exposing (Radians, Polyline, Renderable, Moving)
+module Types exposing (Radians, Polyline, Renderable, Moving, Expiring)
 
 import Math.Vector3 as Vector3 exposing (Vec3)
+import Time exposing (Time)
 
 
 type alias Radians =
@@ -23,4 +24,10 @@ type alias Moving a =
     { a
         | velocity : Vec3
         , rotationInertia : Radians
+    }
+
+
+type alias Expiring a =
+    { a
+        | timeRemaining : Time
     }

@@ -39,6 +39,6 @@ update dt =
 initField : List Asteroid
 initField =
     Random.initialSeed 3780540833
-        |> Random.step (Asteroid.field 200 ( 1200, 900 ) 10)
+        |> Random.step (Asteroid.field ( 1200, 900 ) 200 10)
         |> Tuple.first
         |> Force.separate

@@ -12,7 +12,7 @@ import Time exposing (Time)
 -- project modules
 
 import Screen
-import Types exposing (Radians, Polyline, Renderable, Moving)
+import Types exposing (Radians, Polyline, Renderable, Moving, Expiring)
 
 
 main : Program Never Model Msg
@@ -45,7 +45,7 @@ type alias Model =
 
 
 type alias Player =
-    Moving (Renderable {})
+    Renderable (Moving {})
 
 
 {-| Represents time until next fire.
@@ -55,7 +55,7 @@ type alias Blaster =
 
 
 type alias Blast =
-    Moving (Renderable { timeRemaining : Time })
+    Renderable (Moving (Expiring {}))
 
 
 type alias Controls =
