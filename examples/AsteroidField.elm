@@ -12,6 +12,7 @@ import Time exposing (Time)
 import Asteroid exposing (Asteroid)
 import Force
 import Main exposing (view, wrapPosition)
+import Types exposing (Moving, Positioned)
 
 
 main : Program Never (List Asteroid) Time
@@ -27,13 +28,15 @@ main =
 update : Time -> List Asteroid -> List Asteroid
 update dt =
     List.map
-        (\obj ->
-            { obj
-                | position = obj.velocity |> Vector3.scale dt |> Vector3.add obj.position
-                , rotation = obj.rotationInertia * dt + obj.rotation
-            }
-                |> wrapPosition
-        )
+        (updateMoving dt >> wrapPosition)
+
+
+updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
+updateMoving dt obj =
+    { obj
+        | position = obj.velocity |> Vector3.scale dt |> Vector3.add obj.position
+        , rotation = obj.rotationInertia * dt + obj.rotation
+    }
 
 
 initField : List Asteroid
