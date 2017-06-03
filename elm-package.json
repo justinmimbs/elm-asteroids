@@ -1,7 +1,7 @@
 {
     "version": "0.0.1",
-    "summary": "An [instructive] clone of Asteroids in the Elm programming language",
-    "repository": "https://github.com/aj-foster/asteroids-elm.git",
+    "summary": "An Asteroids clone made with Elm",
+    "repository": "https://github.com/justinmimbs/asteroids.git",
     "license": "MIT",
     "source-directories": [
         "src"
