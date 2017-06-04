@@ -1,27 +1,35 @@
-module Types exposing (Radians, Polyline, Positioned, Moving, Expiring, Renderable)
+module Types exposing (Radians, Point, Polyline, Positioned, Moving, Expiring, Renderable)
 
-import Math.Vector3 as Vector3 exposing (Vec3)
 import Time exposing (Time)
+
+
+-- project
+
+import Geometry.Vector exposing (Vector)
 
 
 type alias Radians =
     Float
 
 
+type alias Point =
+    Vector
+
+
 type alias Polyline =
-    List Vec3
+    List Point
 
 
 type alias Positioned a =
     { a
-        | position : Vec3
+        | position : Point
         , rotation : Radians
     }
 
 
 type alias Moving a =
     { a
-        | velocity : Vec3
+        | velocity : Vector
         , rotationInertia : Radians
     }
 

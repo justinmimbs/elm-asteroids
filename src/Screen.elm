@@ -3,7 +3,11 @@ module Screen exposing (render)
 import Html exposing (Html)
 import Svg exposing (Svg)
 import Svg.Attributes
-import Math.Vector3 as Vector3 exposing (Vec3)
+
+
+-- project
+
+import Types exposing (Point)
 
 
 screenId : String
@@ -11,7 +15,7 @@ screenId =
     "screen"
 
 
-render : ( Float, Float ) -> List (List Vec3) -> Html a
+render : ( Float, Float ) -> List (List Point) -> Html a
 render ( width, height ) polylines =
     Svg.svg
         [ Svg.Attributes.width (width |> toString)
@@ -33,7 +37,7 @@ render ( width, height ) polylines =
         ]
 
 
-viewPolyline : List Vec3 -> Svg a
+viewPolyline : List Point -> Svg a
 viewPolyline polyline =
     Svg.polyline
         [ Svg.Attributes.points (polyline |> polylineToString)
@@ -41,20 +45,20 @@ viewPolyline polyline =
         []
 
 
-polylineToString : List Vec3 -> String
+polylineToString : List Point -> String
 polylineToString =
     List.foldr
-        (vecToString >> (++) " " >> (++))
+        (pointToString >> (++) " " >> (++))
         ""
 
 
-vecToString : Vec3 -> String
-vecToString vec =
-    toString (Vector3.getX vec) ++ "," ++ toString (Vector3.getY vec)
+pointToString : Point -> String
+pointToString ( x, y ) =
+    toString x ++ "," ++ toString y
 
 
 
--- screen projections (3 x 3)
+-- screen projections (3 x 3 grid)
 
 
 viewProjection : Float -> Float -> ( Float, Float ) -> Svg a

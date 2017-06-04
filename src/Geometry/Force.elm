@@ -1,12 +1,16 @@
-module Force exposing (Circle, separate)
+module Geometry.Force exposing (Circle, separate)
 
 import Dict exposing (Dict)
-import Math.Vector3 as Vector3 exposing (Vec3)
+
+
+-- project modules
+
+import Geometry.Vector as Vector
 
 
 type alias Circle a =
     { a
-        | position : Vec3
+        | position : ( Float, Float )
         , radius : Float
     }
 
@@ -56,7 +60,7 @@ separate2 : Float -> Circle a -> Circle a -> Maybe ( Circle a, Circle a )
 separate2 stepCoeff a b =
     let
         distSq =
-            Vector3.distanceSquared a.position b.position
+            Vector.distanceSquared a.position b.position
 
         distSqMin =
             (a.radius + b.radius) ^ 2
@@ -70,16 +74,16 @@ separate2 stepCoeff a b =
 
                 dir =
                     if distSq == 0 then
-                        Vector3.normalize (Vector3.vec3 1 1 0)
+                        Vector.normalize ( 1, 1 )
                     else
-                        Vector3.direction a.position b.position
+                        Vector.direction b.position a.position
 
                 v =
-                    Vector3.scale ((distOverlap / 2) * stepCoeff) dir
+                    Vector.scale ((distOverlap / 2) * stepCoeff) dir
             in
                 Just
-                    ( { a | position = Vector3.add a.position v }
-                    , { b | position = Vector3.sub b.position v }
+                    ( { a | position = Vector.add a.position v }
+                    , { b | position = Vector.sub b.position v }
                     )
 
 

@@ -1,11 +1,11 @@
 module Asteroid exposing (Asteroid, asteroid, field)
 
-import Math.Vector3 as Vector3 exposing (Vec3)
 import Random.Pcg as Random exposing (Generator)
 
 
--- project
+-- project modules
 
+import Geometry.Vector exposing (distanceSquared)
 import Types exposing (Polyline, Renderable, Moving)
 
 
@@ -24,9 +24,8 @@ field ( width, height ) exclusionRadius count =
         (Random.map2
             setPosition
             (Random.pair (Random.float 0 width) (Random.float 0 height)
-                |> Random.map toVec3
                 |> Random.filter
-                    (Vector3.distanceSquared (( width / 2, height / 2 ) |> toVec3) >> ((<) (exclusionRadius ^ 2)))
+                    (distanceSquared ( width / 2, height / 2 ) >> ((<) (exclusionRadius ^ 2)))
             )
             asteroid
         )
@@ -50,13 +49,13 @@ asteroid =
                     (\velocity rotationInertia polyline ->
                         { radius = radius
                         , polylines = [ polyline ]
-                        , position = vec3Zero
+                        , position = ( 0, 0 )
                         , rotation = 0
                         , velocity = velocity
                         , rotationInertia = rotationInertia
                         }
                     )
-                    (Random.pair (Random.float 10 80) (Random.float 0 (pi * 2)) |> Random.map (fromPolar >> toVec3))
+                    (Random.pair (Random.float 10 80) (Random.float 0 (pi * 2)) |> Random.map fromPolar)
                     (Random.float -1 1)
                     (shape radius)
             )
@@ -81,24 +80,10 @@ toShape list =
     in
         list
             |> List.indexedMap
-                (\i ( radius, scale ) -> ( radius, segmentAngle * toFloat i + segmentAngle * scale ) |> fromPolar |> toVec3)
+                (\i ( radius, scale ) -> ( radius, segmentAngle * toFloat i + segmentAngle * scale ) |> fromPolar)
             |> closePath
 
 
 closePath : List a -> List a
 closePath list =
     list ++ List.take 1 list
-
-
-
---
-
-
-toVec3 : ( Float, Float ) -> Vec3
-toVec3 ( x, y ) =
-    Vector3.vec3 x y 0
-
-
-vec3Zero : Vec3
-vec3Zero =
-    Vector3.vec3 0 0 0

@@ -4,15 +4,15 @@ import AnimationFrame
 import Html exposing (Html)
 import Html.Attributes
 import Keyboard
-import Math.Matrix4 as Matrix4 exposing (Mat4)
-import Math.Vector3 as Vector3 exposing (Vec3)
 import Time exposing (Time)
 
 
 -- project modules
 
+import Geometry.Matrix as Matrix exposing (Matrix)
+import Geometry.Vector as Vector exposing (Vector)
 import Screen
-import Types exposing (Radians, Polyline, Renderable, Moving, Expiring)
+import Types exposing (Radians, Point, Polyline, Renderable, Moving, Expiring)
 
 
 main : Program Never Model Msg
@@ -70,9 +70,9 @@ initialModel : Model
 initialModel =
     { player =
         { polylines = spaceship
-        , position = screenSize |> toVec3 |> Vector3.scale 0.5
+        , position = screenSize |> Vector.scale 0.5
         , rotation = pi
-        , velocity = vec3Zero
+        , velocity = Vector.zero
         , rotationInertia = 0
         }
     , blaster = Nothing
@@ -179,13 +179,13 @@ fireBlast dt player timeTilFire =
         let
             -- px / second
             speed =
-                Vector3.length player.velocity + 600
+                Vector.length player.velocity + 600
         in
             Just
-                { polylines = [ [ vec3Zero, Vector3.vec3 0 (speed * dt) 0 ] ]
+                { polylines = [ [ Vector.zero, ( 0, speed * dt ) ] ]
                 , position = player.position
                 , rotation = player.rotation
-                , velocity = ( speed, player.rotation + pi / 2 ) |> fromPolar |> toVec3
+                , velocity = ( speed, player.rotation + pi / 2 ) |> fromPolar
                 , rotationInertia = 0
                 , timeRemaining = 1200 / speed
                 }
@@ -198,7 +198,7 @@ updateBlast dt blast =
     if blast.timeRemaining > 0 then
         Just
             { blast
-                | position = blast.position |> Vector3.add (blast.velocity |> Vector3.scale dt)
+                | position = blast.position |> Vector.add (blast.velocity |> Vector.scale dt)
                 , timeRemaining = blast.timeRemaining - dt
             }
     else
@@ -254,19 +254,19 @@ updatePlayer dt controls entity =
 
         positionThrust =
             if controls.thrust then
-                ( thrustDistance * dt, rotationNext + pi / 2 ) |> fromPolar |> toVec3
+                ( thrustDistance * dt, rotationNext + pi / 2 ) |> fromPolar
             else
-                vec3Zero
+                Vector.zero
 
         positionNext =
             entity.position
-                |> Vector3.add (entity.velocity |> Vector3.scale (positionFriction * dt))
-                |> Vector3.add (positionThrust)
+                |> Vector.add (entity.velocity |> Vector.scale (positionFriction * dt))
+                |> Vector.add (positionThrust)
     in
         { entity
             | position = positionNext
             , rotation = rotationNext
-            , velocity = Vector3.sub positionNext entity.position |> Vector3.scale (1 / dt)
+            , velocity = Vector.sub positionNext entity.position |> Vector.scale (1 / dt)
             , rotationInertia = (rotationNext - entity.rotation) / dt
         }
 
@@ -289,7 +289,7 @@ spaceship =
       , ( -0.5, -1 )
       ]
     ]
-        |> List.map (List.map (toVec3 >> Vector3.scale 18))
+        |> List.map (List.map (Vector.scale 18))
 
 
 screenSize : ( Float, Float )
@@ -297,19 +297,22 @@ screenSize =
     ( 1200, 900 )
 
 
+( screenWidth, screenHeight ) =
+    screenSize
+
+
 wrapPosition : Renderable a -> Renderable a
 wrapPosition object =
     { object
-        | position = object.position |> (uncurry wrapVec3) screenSize
+        | position = object.position |> wrapPoint
     }
 
 
-wrapVec3 : Float -> Float -> Vec3 -> Vec3
-wrapVec3 xMax yMax vec =
-    Vector3.vec3
-        (floatModulo (Vector3.getX vec) xMax)
-        (floatModulo (Vector3.getY vec) yMax)
-        0
+wrapPoint : Point -> Point
+wrapPoint ( x, y ) =
+    ( floatModulo x screenWidth
+    , floatModulo y screenHeight
+    )
 
 
 floatModulo : Float -> Float -> Float
@@ -337,15 +340,13 @@ view objects =
 
 transformRenderable : Renderable a -> List Polyline
 transformRenderable object =
-    let
-        transform =
-            Matrix4.identity
-                |> Matrix4.translate object.position
-                |> Matrix4.rotate object.rotation Vector3.k
-    in
-        List.map
-            (List.map (Matrix4.transform transform))
-            object.polylines
+    List.map
+        (List.map
+            (Matrix.transform
+                (Matrix.init 1 object.rotation object.position)
+            )
+        )
+        object.polylines
 
 
 {-| Strip extended fields. Refactor to remove this step!
@@ -356,13 +357,3 @@ renderable { polylines, position, rotation } =
     , position = position
     , rotation = rotation
     }
-
-
-toVec3 : ( Float, Float ) -> Vec3
-toVec3 ( x, y ) =
-    Vector3.vec3 x y 0
-
-
-vec3Zero : Vec3
-vec3Zero =
-    Vector3.vec3 0 0 0

@@ -2,7 +2,6 @@ module AsteroidShapes exposing (main)
 
 import AnimationFrame
 import Html exposing (Html)
-import Math.Vector3 as Vector3 exposing (Vec3)
 import Random.Pcg as Random
 import Time exposing (Time)
 
@@ -10,7 +9,8 @@ import Time exposing (Time)
 -- project modules
 
 import Asteroid exposing (Asteroid)
-import Force
+import Geometry.Force as Force
+import Geometry.Vector as Vector
 import Main exposing (view, wrapPosition)
 import Types exposing (Moving, Positioned)
 
@@ -34,7 +34,7 @@ update dt =
 updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
 updateMoving dt obj =
     { obj
-        | position = obj.velocity |> Vector3.scale dt |> Vector3.add obj.position
+        | position = obj.velocity |> Vector.scale dt |> Vector.add obj.position
         , rotation = obj.rotationInertia * dt + obj.rotation
     }
 
