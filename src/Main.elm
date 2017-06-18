@@ -4,15 +4,18 @@ import AnimationFrame
 import Html exposing (Html)
 import Html.Attributes
 import Keyboard
+import Random.Pcg as Random
 import Time exposing (Time)
 
 
 -- project modules
 
+import Asteroid exposing (Asteroid)
+import Geometry.Force as Force
 import Geometry.Matrix as Matrix exposing (Matrix)
 import Geometry.Vector as Vector exposing (Vector)
 import Screen
-import Types exposing (Radians, Point, Polyline, Positioned, Moving, Expiring)
+import Types exposing (Radians, Point, Polyline, Polygon, Positioned, Moving, Expiring)
 
 
 main : Program Never Model Msg
@@ -37,7 +40,8 @@ main =
 
 
 type alias Model =
-    { player : Player
+    { asteroids : List Asteroid
+    , player : Player
     , blaster : Blaster
     , blasts : List Blast
     , controls : Controls
@@ -72,7 +76,12 @@ type alias Controls =
 
 initialModel : Model
 initialModel =
-    { player =
+    { asteroids =
+        Random.initialSeed 3780540833
+            |> Random.step (Asteroid.field ( 1200, 900 ) 200 10)
+            |> Tuple.first
+            |> Force.separate
+    , player =
         { polylines = spaceship
         , position = screenSize |> Vector.scale 0.5
         , rotation = pi
@@ -156,6 +165,9 @@ update msg ({ controls } as model) =
 
         Tick dt ->
             let
+                asteroidsNext =
+                    model.asteroids |> List.map (updateMoving dt >> wrapPosition)
+
                 playerNext =
                     model.player |> updatePlayer dt controls |> wrapPosition
 
@@ -171,7 +183,8 @@ update msg ({ controls } as model) =
                         |> List.map wrapPosition
             in
                 { model
-                    | player = playerNext
+                    | asteroids = asteroidsNext
+                    , player = playerNext
                     , blaster = blasterNext
                     , blasts = blastsNext
                 }
@@ -274,8 +287,16 @@ updatePlayer dt controls entity =
         }
 
 
+updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
+updateMoving dt obj =
+    { obj
+        | position = obj.velocity |> Vector.scale dt |> Vector.add obj.position
+        , rotation = obj.rotationInertia * dt + obj.rotation
+    }
 
--- view
+
+
+-- view helpers
 
 
 spaceship : List Polyline
@@ -332,8 +353,10 @@ floatModulo x y =
 
 
 view : Model -> Html a
-view { player, blasts } =
-    [ player.polylines
+view { asteroids, player, blasts } =
+    [ asteroids
+        |> List.map (transformAsteroid >> (,) True)
+    , player.polylines
         |> List.map (transformPolyline player.position player.rotation >> (,) False)
     , blasts
         |> List.map (blastToLine >> (,) False)
@@ -367,3 +390,8 @@ blastToLine { position, velocity, deltaTime } =
     [ position
     , position |> Vector.add (velocity |> Vector.scale deltaTime)
     ]
+
+
+transformAsteroid : Asteroid -> Polygon
+transformAsteroid { polygon, position, rotation } =
+    polygon |> transformPolyline position rotation
