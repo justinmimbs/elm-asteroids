@@ -11,7 +11,8 @@ import Time exposing (Time)
 import Asteroid exposing (Asteroid)
 import Geometry.Force as Force
 import Geometry.Vector as Vector
-import Main exposing (view, wrapPosition)
+import Main exposing (viewPaths, transformPolyline, wrapPosition)
+import Screen
 import Types exposing (Moving, Positioned)
 
 
@@ -20,7 +21,7 @@ main =
     Html.program
         { init = ( initField, Cmd.none )
         , update = \x r -> ( update x r, Cmd.none )
-        , view = view
+        , view = List.map asteroidToPath >> viewPaths
         , subscriptions = always (AnimationFrame.diffs Time.inSeconds)
         }
 
@@ -45,3 +46,10 @@ initField =
         |> Random.step (Asteroid.field ( 1200, 900 ) 200 10)
         |> Tuple.first
         |> Force.separate
+
+
+asteroidToPath : Asteroid -> Screen.Path
+asteroidToPath { polygon, position, rotation } =
+    ( True
+    , polygon |> transformPolyline position rotation
+    )

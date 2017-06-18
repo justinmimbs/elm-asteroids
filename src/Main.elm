@@ -1,4 +1,4 @@
-module Main exposing (main, view, wrapPosition)
+module Main exposing (main, viewPaths, transformPolyline, wrapPosition)
 
 import AnimationFrame
 import Html exposing (Html)
@@ -12,7 +12,7 @@ import Time exposing (Time)
 import Geometry.Matrix as Matrix exposing (Matrix)
 import Geometry.Vector as Vector exposing (Vector)
 import Screen
-import Types exposing (Radians, Point, Polyline, Renderable, Moving, Expiring)
+import Types exposing (Radians, Point, Polyline, Positioned, Moving, Expiring)
 
 
 main : Program Never Model Msg
@@ -20,7 +20,7 @@ main =
     Html.program
         { init = ( initialModel, Cmd.none )
         , update = \msg model -> ( update msg model, Cmd.none )
-        , view = \{ player, blasts } -> view (renderable player :: List.map renderable blasts)
+        , view = view
         , subscriptions =
             always
                 (Sub.batch
@@ -45,7 +45,7 @@ type alias Model =
 
 
 type alias Player =
-    Renderable (Moving {})
+    Positioned (Moving { polylines : List Polyline })
 
 
 {-| Represents time until next fire.
@@ -55,7 +55,11 @@ type alias Blaster =
 
 
 type alias Blast =
-    Renderable (Moving (Expiring {}))
+    Expiring
+        { position : Point
+        , velocity : Vector
+        , deltaTime : Float
+        }
 
 
 type alias Controls =
@@ -182,12 +186,10 @@ fireBlast dt player timeTilFire =
                 Vector.length player.velocity + 600
         in
             Just
-                { polylines = [ [ Vector.zero, ( 0, speed * dt ) ] ]
-                , position = player.position
-                , rotation = player.rotation
+                { position = player.position
                 , velocity = ( speed, player.rotation + pi / 2 ) |> fromPolar
-                , rotationInertia = 0
                 , timeRemaining = 1200 / speed
+                , deltaTime = dt
                 }
     else
         Nothing
@@ -200,6 +202,7 @@ updateBlast dt blast =
             { blast
                 | position = blast.position |> Vector.add (blast.velocity |> Vector.scale dt)
                 , timeRemaining = blast.timeRemaining - dt
+                , deltaTime = dt
             }
     else
         Nothing
@@ -301,7 +304,7 @@ screenSize =
     screenSize
 
 
-wrapPosition : Renderable a -> Renderable a
+wrapPosition : { a | position : Point } -> { a | position : Point }
 wrapPosition object =
     { object
         | position = object.position |> wrapPoint
@@ -324,36 +327,43 @@ floatModulo x y =
         x - n * y
 
 
-view : List (Renderable a) -> Html b
-view objects =
+
+-- view
+
+
+view : Model -> Html a
+view { player, blasts } =
+    [ player.polylines
+        |> List.map (transformPolyline player.position player.rotation >> (,) False)
+    , blasts
+        |> List.map (blastToLine >> (,) False)
+    ]
+        |> List.concat
+        |> viewPaths
+
+
+viewPaths : List Screen.Path -> Html a
+viewPaths paths =
     Html.div
         [ Html.Attributes.style
             [ ( "display", "flex" )
             , ( "justify-content", "center" )
             ]
         ]
-        [ objects
-            |> List.concatMap transformRenderable
-            |> Screen.render screenSize
+        [ paths |> Screen.render screenSize
         ]
 
 
-transformRenderable : Renderable a -> List Polyline
-transformRenderable object =
+transformPolyline : Point -> Radians -> Polyline -> Polyline
+transformPolyline position rotation =
     List.map
-        (List.map
-            (Matrix.transform
-                (Matrix.init 1 object.rotation object.position)
-            )
+        (Matrix.transform
+            (Matrix.init 1 rotation position)
         )
-        object.polylines
 
 
-{-| Strip extended fields. Refactor to remove this step!
--}
-renderable : Renderable a -> Renderable {}
-renderable { polylines, position, rotation } =
-    { polylines = polylines
-    , position = position
-    , rotation = rotation
-    }
+blastToLine : Blast -> Polyline
+blastToLine { position, velocity, deltaTime } =
+    [ position
+    , position |> Vector.add (velocity |> Vector.scale deltaTime)
+    ]

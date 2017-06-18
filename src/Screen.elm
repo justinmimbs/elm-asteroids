@@ -1,4 +1,4 @@
-module Screen exposing (render)
+module Screen exposing (Path, render)
 
 import Html exposing (Html)
 import Svg exposing (Svg)
@@ -10,13 +10,17 @@ import Svg.Attributes
 import Types exposing (Point)
 
 
+type alias Path =
+    ( Bool, List Point )
+
+
 screenId : String
 screenId =
     "screen"
 
 
-render : ( Float, Float ) -> List (List Point) -> Html a
-render ( width, height ) polylines =
+render : ( Float, Float ) -> List Path -> Html a
+render ( width, height ) paths =
     Svg.svg
         [ Svg.Attributes.width (width |> toString)
         , Svg.Attributes.height (height |> toString)
@@ -29,7 +33,7 @@ render ( width, height ) polylines =
             []
             [ Svg.g
                 [ Svg.Attributes.id screenId ]
-                (polylines |> List.map viewPolyline)
+                (paths |> List.map viewPath)
             ]
         , Svg.g
             []
@@ -37,16 +41,21 @@ render ( width, height ) polylines =
         ]
 
 
-viewPolyline : List Point -> Svg a
-viewPolyline polyline =
-    Svg.polyline
-        [ Svg.Attributes.points (polyline |> polylineToString)
+viewPath : ( Bool, List Point ) -> Svg a
+viewPath ( closed, points ) =
+    Svg.node
+        (if closed then
+            "polygon"
+         else
+            "polyline"
+        )
+        [ Svg.Attributes.points (points |> pointsToString)
         ]
         []
 
 
-polylineToString : List Point -> String
-polylineToString =
+pointsToString : List Point -> String
+pointsToString =
     List.foldr
         (pointToString >> (++) " " >> (++))
         ""

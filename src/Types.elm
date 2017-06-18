@@ -1,4 +1,4 @@
-module Types exposing (Radians, Point, Polyline, Positioned, Moving, Expiring, Renderable)
+module Types exposing (Radians, Point, Polyline, Polygon, Positioned, Moving, Expiring)
 
 import Time exposing (Time)
 
@@ -20,6 +20,10 @@ type alias Polyline =
     List Point
 
 
+type alias Polygon =
+    List Point
+
+
 type alias Positioned a =
     { a
         | position : Point
@@ -38,10 +42,3 @@ type alias Expiring a =
     { a
         | timeRemaining : Time
     }
-
-
-type alias Renderable a =
-    Positioned
-        { a
-            | polylines : List Polyline
-        }

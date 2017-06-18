@@ -6,9 +6,10 @@ import Random.Pcg as Random
 
 -- project modules
 
-import Asteroid
+import Asteroid exposing (Asteroid)
 import Geometry.Vector as Vector
-import Main exposing (view)
+import Main exposing (viewPaths, transformPolyline)
+import Screen
 
 
 main : Html a
@@ -17,9 +18,16 @@ main =
         |> Random.step (Random.list (7 * 5) Asteroid.asteroid)
         |> Tuple.first
         |> List.map2
-            (\pos object -> { object | position = pos })
+            (\pos object -> { object | position = pos } |> asteroidToPath)
             (gridPositions ( 7, 5 ) ( 150, 150 ) |> List.map (Vector.add ( 150, 150 )))
-        |> view
+        |> viewPaths
+
+
+asteroidToPath : Asteroid -> Screen.Path
+asteroidToPath { polygon, position, rotation } =
+    ( True
+    , polygon |> transformPolyline position rotation
+    )
 
 
 gridPositions : ( Int, Int ) -> ( Float, Float ) -> List ( Float, Float )
