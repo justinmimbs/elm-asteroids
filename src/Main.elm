@@ -165,9 +165,6 @@ update msg ({ controls } as model) =
 
         Tick dt ->
             let
-                asteroidsNext =
-                    model.asteroids |> List.map (updateMoving dt >> wrapPosition)
-
                 playerNext =
                     model.player |> updatePlayer dt controls |> wrapPosition
 
@@ -181,12 +178,18 @@ update msg ({ controls } as model) =
                         |> Maybe.withDefault model.blasts
                         |> List.filterMap (updateBlast dt)
                         |> List.map wrapPosition
+
+                asteroidsNext =
+                    model.asteroids |> List.map (updateMoving dt >> wrapPosition)
+
+                ( blastsNext2, asteroidsNext2 ) =
+                    interactBlastsAsteroids blastsNext asteroidsNext
             in
                 { model
-                    | asteroids = asteroidsNext
+                    | asteroids = asteroidsNext2
                     , player = playerNext
                     , blaster = blasterNext
-                    , blasts = blastsNext
+                    , blasts = blastsNext2
                 }
 
 
@@ -293,6 +296,41 @@ updateMoving dt obj =
         | position = obj.velocity |> Vector.scale dt |> Vector.add obj.position
         , rotation = obj.rotationInertia * dt + obj.rotation
     }
+
+
+
+-- interactions
+
+
+interactBlastsAsteroids : List Blast -> List Asteroid -> ( List Blast, List Asteroid )
+interactBlastsAsteroids blasts asteroids =
+    List.foldl
+        (interactBlastAsteroids [])
+        ( [], asteroids )
+        blasts
+
+
+interactBlastAsteroids : List Asteroid -> Blast -> ( List Blast, List Asteroid ) -> ( List Blast, List Asteroid )
+interactBlastAsteroids asteroidsResult blast ( blastsResult, asteroids ) =
+    case asteroids of
+        [] ->
+            ( blast :: blastsResult, asteroidsResult )
+
+        asteroid :: asteroidsRest ->
+            case interactBlastAsteroid blast asteroid of
+                Just asteroidDamage ->
+                    ( blastsResult, asteroidsResult ++ asteroidDamage ++ asteroidsRest )
+
+                Nothing ->
+                    interactBlastAsteroids (asteroid :: asteroidsResult) blast ( blastsResult, asteroidsRest )
+
+
+interactBlastAsteroid : Blast -> Asteroid -> Maybe (List Asteroid)
+interactBlastAsteroid blast asteroid =
+    if Vector.distanceSquared blast.position asteroid.position < asteroid.radius ^ 2 then
+        Just []
+    else
+        Nothing
 
 
 
