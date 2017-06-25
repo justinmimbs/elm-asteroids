@@ -1,4 +1,4 @@
-module Main exposing (main, viewPaths, transformPolyline, wrapPosition)
+module Main exposing (main, viewPaths, transformPoints, wrapPosition)
 
 import AnimationFrame
 import Html exposing (Html)
@@ -15,10 +15,10 @@ import Geometry.Circle as Circle
 import Geometry.Force as Force
 import Geometry.Line as Line exposing (Intersection(SegmentSegment))
 import Geometry.Matrix as Matrix exposing (Matrix)
-import Geometry.Polygon as Polygon
-import Geometry.Vector as Vector exposing (Vector)
+import Geometry.Polygon as Polygon exposing (Polygon)
+import Geometry.Vector as Vector exposing (Vector, Point)
 import Screen
-import Types exposing (Radians, Point, Polyline, Polygon, Positioned, Moving, Expiring)
+import Types exposing (Radians, Polyline, Positioned, Moving, Expiring)
 
 
 main : Program Never Model Msg
@@ -348,7 +348,7 @@ interactBlastAsteroid blast asteroid =
                                         ( fragmentPosition, fragmentRadius ) =
                                             fragment |> Circle.enclose
                                     in
-                                        { polygon = fragment |> transformPolyline (Vector.negate fragmentPosition) 0
+                                        { polygon = fragment |> transformPoints (Vector.negate fragmentPosition) 0
                                         , radius = fragmentRadius
                                         , position = fragmentPosition
                                         , rotation = 0
@@ -454,7 +454,7 @@ view { asteroids, player, blasts } =
     [ asteroids
         |> List.map (transformAsteroid >> (,) True)
     , player.polylines
-        |> List.map (transformPolyline player.position player.rotation >> (,) False)
+        |> List.map (transformPoints player.position player.rotation >> (,) False)
     , blasts
         |> List.map (blastToLine >> (,) False)
     ]
@@ -474,8 +474,8 @@ viewPaths paths =
         ]
 
 
-transformPolyline : Point -> Radians -> Polyline -> Polyline
-transformPolyline position rotation =
+transformPoints : Point -> Radians -> List Point -> List Point
+transformPoints position rotation =
     List.map
         (Matrix.transform
             (Matrix.init 1 rotation position)
@@ -496,7 +496,7 @@ blastToLine blast =
 
 transformAsteroid : Asteroid -> Polygon
 transformAsteroid { polygon, position, rotation } =
-    polygon |> transformPolyline position rotation
+    polygon |> transformPoints position rotation
 
 
 

@@ -1,10 +1,7 @@
 module Geometry.Polygon exposing (Polygon, split, fold)
 
 import Geometry.Line as Line exposing (Intersection(LineSegment))
-
-
-type alias Point =
-    ( Float, Float )
+import Geometry.Vector exposing (Point)
 
 
 type alias Polygon =

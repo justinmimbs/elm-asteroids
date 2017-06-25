@@ -1,16 +1,16 @@
-module Geometry.Force exposing (Circle, separate)
+module Geometry.Force exposing (separate)
 
 import Dict exposing (Dict)
 
 
 -- project modules
 
-import Geometry.Vector as Vector
+import Geometry.Vector as Vector exposing (Point)
 
 
 type alias Circle a =
     { a
-        | position : ( Float, Float )
+        | position : Point
         , radius : Float
     }
 

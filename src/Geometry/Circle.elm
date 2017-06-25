@@ -1,11 +1,7 @@
 module Geometry.Circle exposing (Circle, enclose)
 
 import Geometry.Line as Line exposing (Intersection(LineLine), midpoint)
-import Geometry.Vector exposing (distanceSquared)
-
-
-type alias Point =
-    ( Float, Float )
+import Geometry.Vector exposing (Point, distanceSquared)
 
 
 circumcenter3 : Point -> Point -> Point -> Maybe Point

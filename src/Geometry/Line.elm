@@ -1,8 +1,6 @@
 module Geometry.Line exposing (midpoint, perpendicularBisector, Intersection(..), intersect)
 
-
-type alias Point =
-    ( Float, Float )
+import Geometry.Vector exposing (Point)
 
 
 midpoint : Point -> Point -> Point

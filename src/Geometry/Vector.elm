@@ -1,8 +1,12 @@
-module Geometry.Vector exposing (Vector, zero, length, lengthSquared, normalize, negate, scale, add, sub, distance, distanceSquared, direction)
+module Geometry.Vector exposing (Vector, Point, zero, length, lengthSquared, normalize, negate, scale, add, sub, distance, distanceSquared, direction)
 
 
 type alias Vector =
     ( Float, Float )
+
+
+type alias Point =
+    Vector
 
 
 zero : Vector

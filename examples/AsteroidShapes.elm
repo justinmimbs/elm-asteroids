@@ -8,7 +8,7 @@ import Random.Pcg as Random
 
 import Asteroid exposing (Asteroid)
 import Geometry.Vector as Vector
-import Main exposing (viewPaths, transformPolyline)
+import Main exposing (viewPaths, transformPoints)
 import Screen
 
 
@@ -26,7 +26,7 @@ main =
 asteroidToPath : Asteroid -> Screen.Path
 asteroidToPath { polygon, position, rotation } =
     ( True
-    , polygon |> transformPolyline position rotation
+    , polygon |> transformPoints position rotation
     )
 
 

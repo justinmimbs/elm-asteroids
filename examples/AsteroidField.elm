@@ -11,7 +11,7 @@ import Time exposing (Time)
 import Asteroid exposing (Asteroid)
 import Geometry.Force as Force
 import Geometry.Vector as Vector
-import Main exposing (viewPaths, transformPolyline, wrapPosition)
+import Main exposing (viewPaths, transformPoints, wrapPosition)
 import Screen
 import Types exposing (Moving, Positioned)
 
@@ -51,5 +51,5 @@ initField =
 asteroidToPath : Asteroid -> Screen.Path
 asteroidToPath { polygon, position, rotation } =
     ( True
-    , polygon |> transformPolyline position rotation
+    , polygon |> transformPoints position rotation
     )

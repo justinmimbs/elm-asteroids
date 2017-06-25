@@ -5,8 +5,9 @@ import Random.Pcg as Random exposing (Generator)
 
 -- project modules
 
-import Geometry.Vector exposing (distanceSquared)
-import Types exposing (Polygon, Positioned, Moving)
+import Geometry.Polygon exposing (Polygon)
+import Geometry.Vector exposing (Point, distanceSquared)
+import Types exposing (Positioned, Moving)
 
 
 type alias Asteroid =

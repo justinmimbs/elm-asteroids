@@ -7,7 +7,7 @@ import Svg.Attributes
 
 -- project
 
-import Types exposing (Point)
+import Geometry.Vector exposing (Point)
 
 
 type alias Path =
