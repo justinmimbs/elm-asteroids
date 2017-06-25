@@ -11,8 +11,11 @@ import Time exposing (Time)
 -- project modules
 
 import Asteroid exposing (Asteroid)
+import Geometry.Circle as Circle
 import Geometry.Force as Force
+import Geometry.Line as Line exposing (Intersection(SegmentSegment))
 import Geometry.Matrix as Matrix exposing (Matrix)
+import Geometry.Polygon as Polygon
 import Geometry.Vector as Vector exposing (Vector)
 import Screen
 import Types exposing (Radians, Point, Polyline, Polygon, Positioned, Moving, Expiring)
@@ -201,12 +204,12 @@ fireBlast dt player timeTilFire =
             speed =
                 Vector.length player.velocity + 600
         in
-            Just
-                { position = player.position
-                , velocity = ( speed, player.rotation + pi / 2 ) |> fromPolar
-                , timeRemaining = 1200 / speed
-                , deltaTime = dt
-                }
+            { position = player.position
+            , velocity = ( speed, player.rotation + pi / 2 ) |> fromPolar
+            , timeRemaining = 1200 / speed
+            , deltaTime = dt
+            }
+                |> updateBlast dt
     else
         Nothing
 
@@ -328,9 +331,65 @@ interactBlastAsteroids asteroidsResult blast ( blastsResult, asteroids ) =
 interactBlastAsteroid : Blast -> Asteroid -> Maybe (List Asteroid)
 interactBlastAsteroid blast asteroid =
     if Vector.distanceSquared blast.position asteroid.position < asteroid.radius ^ 2 then
-        Just []
+        let
+            asteroidPolygon =
+                asteroid |> transformAsteroid
+
+            ( a, b ) =
+                ( blast |> blastTrailPosition, blast.position )
+        in
+            impactPoint a b asteroidPolygon
+                |> Maybe.map
+                    (\impact ->
+                        Polygon.split a b asteroidPolygon
+                            |> List.map
+                                (\fragment ->
+                                    let
+                                        ( fragmentPosition, fragmentRadius ) =
+                                            fragment |> Circle.enclose
+                                    in
+                                        { polygon = fragment |> transformPolyline (Vector.negate fragmentPosition) 0
+                                        , radius = fragmentRadius
+                                        , position = fragmentPosition
+                                        , rotation = 0
+                                        , velocity =
+                                            Vector.add
+                                                (asteroid.velocity |> Vector.scale (fragmentRadius / (blastWeight + fragmentRadius)))
+                                                (blast.velocity |> Vector.scale (blastWeight / (blastWeight + fragmentRadius)))
+                                        , rotationInertia = asteroid.rotationInertia
+                                        }
+                                )
+                    )
     else
         Nothing
+
+
+blastWeight : Float
+blastWeight =
+    3
+
+
+impactPoint : Point -> Point -> Polygon -> Maybe Point
+impactPoint a b polygon =
+    let
+        intersections =
+            Polygon.fold
+                (Line.intersect SegmentSegment a b >>> unwrap identity (::))
+                []
+                polygon
+    in
+        case intersections of
+            [] ->
+                Nothing
+
+            [ p ] ->
+                Just p
+
+            [ p, q ] ->
+                Just ((a < b |> either min max) p q)
+
+            points ->
+                (a < b |> either List.minimum List.maximum) points
 
 
 
@@ -423,13 +482,45 @@ transformPolyline position rotation =
         )
 
 
+blastTrailPosition : Blast -> Point
+blastTrailPosition { position, velocity, deltaTime } =
+    Vector.sub position (velocity |> Vector.scale (deltaTime * 1.1))
+
+
 blastToLine : Blast -> Polyline
-blastToLine { position, velocity, deltaTime } =
-    [ position
-    , position |> Vector.add (velocity |> Vector.scale deltaTime)
+blastToLine blast =
+    [ blastTrailPosition blast
+    , blast.position
     ]
 
 
 transformAsteroid : Asteroid -> Polygon
 transformAsteroid { polygon, position, rotation } =
     polygon |> transformPolyline position rotation
+
+
+
+-- helpers
+
+
+either : a -> a -> Bool -> a
+either t f x =
+    if x then
+        t
+    else
+        f
+
+
+unwrap : b -> (a -> b) -> Maybe a -> b
+unwrap default f m =
+    case m of
+        Just x ->
+            f x
+
+        Nothing ->
+            default
+
+
+(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
+(>>>) f g x y =
+    g (f x y)

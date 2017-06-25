@@ -1,4 +1,4 @@
-module Geometry.Vector exposing (Vector, zero, length, lengthSquared, normalize, scale, add, sub, distance, distanceSquared, direction)
+module Geometry.Vector exposing (Vector, zero, length, lengthSquared, normalize, negate, scale, add, sub, distance, distanceSquared, direction)
 
 
 type alias Vector =
@@ -29,6 +29,13 @@ normalize (( x, y ) as vec) =
         ( x / len
         , y / len
         )
+
+
+negate : Vector -> Vector
+negate ( x, y ) =
+    ( Basics.negate x
+    , Basics.negate y
+    )
 
 
 scale : Float -> Vector -> Vector
