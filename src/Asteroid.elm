@@ -47,11 +47,11 @@ asteroid =
         |> Random.andThen
             (\radius ->
                 Random.map3
-                    (\velocity rotationInertia polygon ->
+                    (\velocity angularVelocity polygon ->
                         { position = ( 0, 0 )
                         , rotation = 0
                         , velocity = velocity
-                        , rotationInertia = rotationInertia
+                        , angularVelocity = angularVelocity
                         , radius = radius
                         , polygon = polygon
                         }

@@ -89,7 +89,7 @@ initialModel =
         , position = screenSize |> Vector.scale 0.5
         , rotation = pi
         , velocity = Vector.zero
-        , rotationInertia = 0
+        , angularVelocity = 0
         }
     , blaster = Nothing
     , blasts = []
@@ -245,7 +245,7 @@ updateBlaster dt fire blaster =
 
 
 playerSettings =
-    { thrustRadians = 1.8 -- rad / second
+    { thrustRadians = 1.6 -- rad / second
     , thrustDistance = 35 -- px / second
     , positionFriction = 0.98
     , rotationFriction = 0.8
@@ -271,7 +271,7 @@ updatePlayer dt controls entity =
 
         rotationNext =
             entity.rotation
-                + (entity.rotationInertia * rotationFriction * dt)
+                + (entity.angularVelocity * rotationFriction * dt)
                 + rotationThrust
 
         positionThrust =
@@ -289,15 +289,15 @@ updatePlayer dt controls entity =
             | position = positionNext
             , rotation = rotationNext
             , velocity = Vector.sub positionNext entity.position |> Vector.scale (1 / dt)
-            , rotationInertia = (rotationNext - entity.rotation) / dt
+            , angularVelocity = (rotationNext - entity.rotation) / dt
         }
 
 
 updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
 updateMoving dt obj =
     { obj
-        | position = obj.velocity |> Vector.scale dt |> Vector.add obj.position
-        , rotation = obj.rotationInertia * dt + obj.rotation
+        | position = obj.position |> Vector.add (obj.velocity |> Vector.scale dt)
+        , rotation = obj.rotation + obj.angularVelocity * dt
     }
 
 
@@ -341,32 +341,51 @@ interactBlastAsteroid blast asteroid =
             impactPoint a b asteroidPolygon
                 |> Maybe.map
                     (\impact ->
-                        Polygon.split a b asteroidPolygon
-                            |> List.map
-                                (\fragment ->
-                                    let
-                                        ( fragmentPosition, fragmentRadius ) =
-                                            fragment |> Circle.enclose
-                                    in
-                                        { polygon = fragment |> transformPoints (Vector.negate fragmentPosition) 0
-                                        , radius = fragmentRadius
-                                        , position = fragmentPosition
-                                        , rotation = 0
-                                        , velocity =
-                                            Vector.add
-                                                (asteroid.velocity |> Vector.scale (fragmentRadius / (blastWeight + fragmentRadius)))
-                                                (blast.velocity |> Vector.scale (blastWeight / (blastWeight + fragmentRadius)))
-                                        , rotationInertia = asteroid.rotationInertia
-                                        }
-                                )
+                        let
+                            blastDirection =
+                                blast.velocity |> Vector.normalize
+
+                            forceSpeed =
+                                (blast.velocity |> Vector.length)
+                                    * (blastMass / (blastMass + asteroid.radius ^ 2))
+                        in
+                            Polygon.split a b asteroidPolygon
+                                |> List.map
+                                    (\fragment ->
+                                        let
+                                            ( fragmentPosition, fragmentRadius ) =
+                                                fragment |> Circle.enclose
+
+                                            forceDirection =
+                                                Vector.direction impact fragmentPosition
+                                        in
+                                            { polygon = fragment |> List.map ((flip Vector.sub) fragmentPosition)
+                                            , radius = fragmentRadius
+                                            , position = fragmentPosition
+                                            , rotation = 0
+                                            , velocity =
+                                                asteroid.velocity
+                                                    |> Vector.add (forceDirection |> Vector.scale forceSpeed)
+                                            , angularVelocity =
+                                                asteroid.angularVelocity
+                                                    + (angleFrom blastDirection forceDirection)
+                                            }
+                                    )
                     )
     else
         Nothing
 
 
-blastWeight : Float
-blastWeight =
-    3
+blastMass : Float
+blastMass =
+    200
+
+
+{-| Directed angle; assumes unit vectors.
+-}
+angleFrom : Vector -> Vector -> Float
+angleFrom a b =
+    atan2 (Vector.cross a b) (Vector.dot a b)
 
 
 impactPoint : Point -> Point -> Polygon -> Maybe Point

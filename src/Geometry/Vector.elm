@@ -1,4 +1,4 @@
-module Geometry.Vector exposing (Vector, Point, zero, length, lengthSquared, normalize, negate, scale, add, sub, distance, distanceSquared, direction)
+module Geometry.Vector exposing (Vector, Point, zero, length, lengthSquared, normalize, negate, scale, add, sub, dot, cross, distance, distanceSquared, direction)
 
 
 type alias Vector =
@@ -63,16 +63,26 @@ sub ( x, y ) ( u, v ) =
     )
 
 
-distance : Vector -> Vector -> Float
+dot : Vector -> Vector -> Float
+dot ( x, y ) ( u, v ) =
+    x * u + y * v
+
+
+cross : Vector -> Vector -> Float
+cross ( x, y ) ( u, v ) =
+    x * v - y * u
+
+
+distance : Point -> Point -> Float
 distance a b =
     distanceSquared a b |> sqrt
 
 
-distanceSquared : Vector -> Vector -> Float
+distanceSquared : Point -> Point -> Float
 distanceSquared ( x, y ) ( u, v ) =
     (u - x) ^ 2 + (v - y) ^ 2
 
 
-direction : Vector -> Vector -> Vector
+direction : Point -> Point -> Vector
 direction a b =
     sub b a |> normalize

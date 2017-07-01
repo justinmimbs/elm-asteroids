@@ -35,8 +35,8 @@ update dt =
 updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
 updateMoving dt obj =
     { obj
-        | position = obj.velocity |> Vector.scale dt |> Vector.add obj.position
-        , rotation = obj.rotationInertia * dt + obj.rotation
+        | position = obj.position |> Vector.add (obj.velocity |> Vector.scale dt)
+        , rotation = obj.rotation + obj.angularVelocity * dt
     }
 
 

@@ -26,7 +26,7 @@ type alias Positioned a =
 type alias Moving a =
     { a
         | velocity : Vector
-        , rotationInertia : Radians
+        , angularVelocity : Radians
     }
 
 
