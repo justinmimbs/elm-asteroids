@@ -81,7 +81,7 @@ initialModel : Model
 initialModel =
     { asteroids =
         Random.initialSeed 3780540833
-            |> Random.step (Asteroid.field ( 1200, 900 ) 200 10)
+            |> Random.step (Asteroid.field screenSize (screenWidth / 6) 10)
             |> Tuple.first
             |> Force.separate
     , player =
@@ -202,11 +202,11 @@ fireBlast dt player timeTilFire =
         let
             -- px / second
             speed =
-                Vector.length player.velocity + 600
+                Vector.length player.velocity + 800
         in
             { position = player.position
             , velocity = ( speed, player.rotation + pi / 2 ) |> fromPolar
-            , timeRemaining = 1200 / speed
+            , timeRemaining = screenWidth / speed
             , deltaTime = dt
             }
                 |> updateBlast dt
@@ -378,7 +378,7 @@ interactBlastAsteroid blast asteroid =
 
 blastMass : Float
 blastMass =
-    200
+    100
 
 
 {-| Directed angle; assumes unit vectors.
