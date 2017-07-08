@@ -1,4 +1,4 @@
-module Main exposing (main, viewPaths, transformPoints, wrapPosition)
+module Main exposing (main, viewPaths, transformPoints, wrapPosition, updateMoving, updateExpiring)
 
 import AnimationFrame
 import Html exposing (Html)
@@ -299,6 +299,15 @@ updateMoving dt obj =
         | position = obj.position |> Vector.add (obj.velocity |> Vector.scale dt)
         , rotation = obj.rotation + obj.angularVelocity * dt
     }
+
+
+updateExpiring : Time -> Expiring a -> Maybe (Expiring a)
+updateExpiring dt obj =
+    if obj.timeRemaining > 0 then
+        Just
+            { obj | timeRemaining = obj.timeRemaining - dt }
+    else
+        Nothing
 
 
 

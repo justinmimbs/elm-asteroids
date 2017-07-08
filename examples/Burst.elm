@@ -13,9 +13,9 @@ import Time exposing (Time)
 -- project
 
 import Geometry.Vector as Vector exposing (Vector, Point)
-import Main exposing (transformPoints, wrapPosition)
+import Main exposing (transformPoints, wrapPosition, updateMoving, updateExpiring)
 import Screen
-import Types exposing (Radians, Polyline, Moving, Positioned, Expiring)
+import Particle exposing (Particle)
 
 
 type alias Model =
@@ -85,7 +85,7 @@ update msg model =
 
 generateBurst : Point -> Vector -> Random.Seed -> ( List Particle, Random.Seed )
 generateBurst origin velocity =
-    burst
+    Particle.burst
         |> Random.map
             (List.map
                 (\particle ->
@@ -177,30 +177,9 @@ px =
 -- Particle
 
 
-type alias Particle =
-    Positioned (Moving (Expiring { polyline : Polyline }))
-
-
 updateParticle : Time -> Particle -> Maybe Particle
 updateParticle dt =
     updateMoving dt >> wrapPosition >> updateExpiring dt
-
-
-updateExpiring : Time -> Expiring a -> Maybe (Expiring a)
-updateExpiring dt obj =
-    if obj.timeRemaining > 0 then
-        Just
-            { obj | timeRemaining = obj.timeRemaining - dt }
-    else
-        Nothing
-
-
-updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
-updateMoving dt obj =
-    { obj
-        | position = obj.position |> Vector.add (obj.velocity |> Vector.scale dt)
-        , rotation = obj.rotation + obj.angularVelocity * dt
-    }
 
 
 particleToPath : Particle -> Screen.Path
@@ -208,39 +187,3 @@ particleToPath { polyline, position, rotation } =
     ( False
     , polyline |> transformPoints position rotation
     )
-
-
-
--- generators
-
-
-burst : Generator (List Particle)
-burst =
-    Random.int 6 18
-        |> Random.andThen ((flip Random.list) particle)
-
-
-particle : Generator Particle
-particle =
-    Random.map4
-        toParticle
-        (Random.float pi (negate pi))
-        (Random.float 200 500)
-        (Random.float 40 160)
-        (Random.float (pi * 2) (pi * -2))
-
-
-toParticle : Radians -> Float -> Float -> Radians -> Particle
-toParticle direction speed travel angularVelocity =
-    { position = Vector.zero
-    , rotation = direction
-    , velocity = ( speed, direction ) |> fromPolar
-    , angularVelocity = angularVelocity
-    , timeRemaining = travel / speed
-    , polyline = particleLine
-    }
-
-
-particleLine : Polyline
-particleLine =
-    [ ( 0, -1 ), ( 0, 1 ) ]
