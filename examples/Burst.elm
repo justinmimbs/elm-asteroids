@@ -12,16 +12,18 @@ import Time exposing (Time)
 
 -- project
 
+import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
 import Main exposing (transformPoints, wrapPosition, updateMoving, updateExpiring)
-import Screen
 import Particle exposing (Particle)
+import Screen
 
 
 type alias Model =
     { drag : Maybe ( Point, Point )
     , seed : Random.Seed
     , particles : List Particle
+    , polygon : Polygon
     }
 
 
@@ -32,6 +34,7 @@ main =
             ( { drag = Nothing
               , seed = Random.initialSeed 3780540833
               , particles = []
+              , polygon = Polygon.ngon 5 |> List.map (Vector.scale 10)
               }
             , Cmd.none
             )
@@ -67,35 +70,46 @@ update msg model =
                     model
 
         MouseUp ->
-            let
-                ( particles, seedNext ) =
-                    model.drag
-                        |> Maybe.map (\( p0, p1 ) -> generateBurst p1 (Vector.sub p1 p0) model.seed)
-                        |> Maybe.withDefault ( [], model.seed )
-            in
-                { model
-                    | drag = Nothing
-                    , seed = seedNext
-                    , particles = particles ++ model.particles
-                }
+            case model.drag of
+                Just ( p0, p1 ) ->
+                    let
+                        ( particles, seedNext ) =
+                            Random.map
+                                (\( burst, polygonParts ) ->
+                                    burst
+                                        ++ polygonParts
+                                        |> List.map (adjustParticle p1 (Vector.sub p1 p0))
+                                )
+                                (Random.pair
+                                    (Particle.burst 300 100 10)
+                                    (Particle.explode 100 150 model.polygon)
+                                )
+                                |> (flip Random.step) model.seed
+                    in
+                        { model
+                            | drag = Nothing
+                            , seed = seedNext
+                            , particles = model.particles ++ particles
+                        }
+
+                Nothing ->
+                    model
 
         Tick dt ->
             { model | particles = model.particles |> List.filterMap (updateParticle dt) }
 
 
-generateBurst : Point -> Vector -> Random.Seed -> ( List Particle, Random.Seed )
-generateBurst origin velocity =
-    Particle.burst
-        |> Random.map
-            (List.map
-                (\particle ->
-                    { particle
-                        | position = origin
-                        , velocity = particle.velocity |> Vector.add velocity
-                    }
-                )
-            )
-        |> Random.step
+adjustParticle : Point -> Vector -> Particle -> Particle
+adjustParticle position velocity particle =
+    { particle
+        | position = particle.position |> Vector.add position
+        , velocity = particle.velocity |> Vector.add velocity
+    }
+
+
+updateParticle : Time -> Particle -> Maybe Particle
+updateParticle dt =
+    updateMoving dt >> wrapPosition >> updateExpiring dt
 
 
 
@@ -112,7 +126,7 @@ screenSize =
 
 
 view : Model -> Html Msg
-view { drag, particles } =
+view { drag, particles, polygon } =
     let
         attributes =
             [ Svg.Attributes.width (width |> px)
@@ -125,12 +139,47 @@ view { drag, particles } =
                 |> Maybe.map
                     (always [ mousemove, mouseup ])
                 |> Maybe.withDefault [ mousedown ]
+
+        paths : List ( Bool, List Point )
+        paths =
+            List.concat
+                [ drag |> Maybe.map (\( _, p1 ) -> polygon |> List.map (Vector.add p1) |> (,) True) |> listFromMaybe
+                , particles |> List.map particleToPath
+                ]
     in
         Svg.svg
             (attributes ++ events)
             [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
-            , Screen.render screenSize (particles |> List.map particleToPath)
+            , Screen.render screenSize paths
             ]
+
+
+particleToPath : Particle -> Screen.Path
+particleToPath { polyline, position, rotation } =
+    ( False
+    , polyline |> transformPoints position rotation
+    )
+
+
+viewLine : ( Point, Point ) -> Svg a
+viewLine ( ( x1, y1 ), ( x2, y2 ) ) =
+    Svg.line
+        [ Svg.Attributes.x1 (x1 |> px)
+        , Svg.Attributes.y1 (y1 |> px)
+        , Svg.Attributes.x2 (x2 |> px)
+        , Svg.Attributes.y2 (y2 |> px)
+        , Svg.Attributes.style "stroke: rgba(0, 0, 0, 0.1)"
+        ]
+        []
+
+
+px : Float -> String
+px =
+    toString >> (++) >> (|>) "px"
+
+
+
+-- events
 
 
 mouseup : Svg.Attribute Msg
@@ -156,34 +205,15 @@ decodeMouseOffset =
         (Json.Decode.field "offsetY" Json.Decode.float)
 
 
-viewLine : ( Point, Point ) -> Svg a
-viewLine ( ( x1, y1 ), ( x2, y2 ) ) =
-    Svg.line
-        [ Svg.Attributes.x1 (x1 |> px)
-        , Svg.Attributes.y1 (y1 |> px)
-        , Svg.Attributes.x2 (x2 |> px)
-        , Svg.Attributes.y2 (y2 |> px)
-        , Svg.Attributes.style "stroke: rgba(0, 0, 0, 0.1)"
-        ]
-        []
+
+-- list
 
 
-px : Float -> String
-px =
-    toString >> (++) >> (|>) "px"
+listFromMaybe : Maybe a -> List a
+listFromMaybe mx =
+    case mx of
+        Just x ->
+            [ x ]
 
-
-
--- Particle
-
-
-updateParticle : Time -> Particle -> Maybe Particle
-updateParticle dt =
-    updateMoving dt >> wrapPosition >> updateExpiring dt
-
-
-particleToPath : Particle -> Screen.Path
-particleToPath { polyline, position, rotation } =
-    ( False
-    , polyline |> transformPoints position rotation
-    )
+        Nothing ->
+            []

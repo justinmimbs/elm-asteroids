@@ -1,4 +1,4 @@
-module Geometry.Polygon exposing (Polygon, split, fold)
+module Geometry.Polygon exposing (Polygon, ngon, fold, toSegments, split)
 
 import Geometry.Line as Line exposing (Intersection(LineSegment))
 import Geometry.Vector exposing (Point)
@@ -6,6 +6,57 @@ import Geometry.Vector exposing (Point)
 
 type alias Polygon =
     List Point
+
+
+
+-- create
+
+
+ngon : Int -> Polygon
+ngon n =
+    let
+        sectionAngle =
+            (pi * 2) / toFloat n
+    in
+        List.range 1 n
+            |> List.map (toFloat >> (*) sectionAngle >> (,) 1 >> fromPolar)
+
+
+
+-- transform
+
+
+{-| Left fold over each item with the next, and the last item with the first.
+This is useful for folding over the segments formed by a list of points.
+-}
+fold : (a -> a -> b -> b) -> b -> List a -> b
+fold f2 result list =
+    case list of
+        head :: _ ->
+            foldHelp head f2 result list
+
+        [] ->
+            result
+
+
+foldHelp : a -> (a -> a -> b -> b) -> b -> List a -> b
+foldHelp head f2 result list =
+    case list of
+        x :: ((y :: _) as rest) ->
+            foldHelp head f2 (f2 x y result) rest
+
+        last :: [] ->
+            f2 last head result
+
+        [] ->
+            result
+
+
+toSegments : Polygon -> List ( Point, Point )
+toSegments =
+    fold
+        ((,) >>> (::))
+        []
 
 
 
@@ -101,30 +152,9 @@ fromSplitPoints ( working, waiting, completed ) list =
 
 
 
--- helpers
+--
 
 
-{-| Left fold over each item with the next, and the last item with the first.
-This is useful for folding over the segments formed by a list of points.
--}
-fold : (a -> a -> b -> b) -> b -> List a -> b
-fold f2 result list =
-    case list of
-        head :: _ ->
-            foldHelp head f2 result list
-
-        [] ->
-            result
-
-
-foldHelp : a -> (a -> a -> b -> b) -> b -> List a -> b
-foldHelp head f2 result list =
-    case list of
-        x :: ((y :: _) as rest) ->
-            foldHelp head f2 (f2 x y result) rest
-
-        last :: [] ->
-            f2 last head result
-
-        [] ->
-            result
+(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
+(>>>) f g x y =
+    g (f x y)

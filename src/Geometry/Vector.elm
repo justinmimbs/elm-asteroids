@@ -1,4 +1,4 @@
-module Geometry.Vector exposing (Vector, Point, zero, length, lengthSquared, normalize, negate, scale, add, sub, dot, cross, distance, distanceSquared, direction)
+module Geometry.Vector exposing (Vector, Point, zero, length, lengthSquared, angle, normalize, negate, scale, add, sub, dot, cross, distance, distanceSquared, direction)
 
 
 type alias Vector =
@@ -22,6 +22,11 @@ length =
 lengthSquared : Vector -> Float
 lengthSquared ( x, y ) =
     x ^ 2 + y ^ 2
+
+
+angle : Vector -> Float
+angle ( x, y ) =
+    atan2 y x
 
 
 normalize : Vector -> Vector
