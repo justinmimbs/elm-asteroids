@@ -391,28 +391,40 @@ interactBlastAsteroid blast asteroid =
                                     |> Random.map (List.map (adjustParticle impact asteroid.velocity))
                         in
                             Polygon.split a b asteroidPolygon
-                                |> List.map
-                                    (\fragment ->
+                                |> List.foldl
+                                    (\fragment ( fragments, particles ) ->
                                         let
                                             ( fragmentPosition, fragmentRadius ) =
                                                 fragment |> Circle.enclose
 
                                             forceDirection =
                                                 Vector.direction impact fragmentPosition
+
+                                            fragmentPolygon =
+                                                fragment |> List.map ((flip Vector.sub) fragmentPosition)
+
+                                            fragmentVelocity =
+                                                asteroid.velocity |> Vector.add (forceDirection |> Vector.scale forceSpeed)
                                         in
-                                            { polygon = fragment |> List.map ((flip Vector.sub) fragmentPosition)
-                                            , radius = fragmentRadius
-                                            , position = fragmentPosition
-                                            , rotation = 0
-                                            , velocity =
-                                                asteroid.velocity
-                                                    |> Vector.add (forceDirection |> Vector.scale forceSpeed)
-                                            , angularVelocity =
-                                                asteroid.angularVelocity
-                                                    + (angleFrom blastDirection forceDirection)
-                                            }
+                                            if fragmentRadius < 20 then
+                                                ( fragments
+                                                , Particle.explode forceSpeed forceSpeed fragmentPolygon
+                                                    |> Random.map (List.map (adjustParticle fragmentPosition fragmentVelocity))
+                                                    |> Random.map2 (++) particles
+                                                )
+                                            else
+                                                ( { polygon = fragmentPolygon
+                                                  , radius = fragmentRadius
+                                                  , position = fragmentPosition
+                                                  , rotation = 0
+                                                  , velocity = fragmentVelocity
+                                                  , angularVelocity = asteroid.angularVelocity + (angleFrom blastDirection forceDirection)
+                                                  }
+                                                    :: fragments
+                                                , particles
+                                                )
                                     )
-                                |> (flip (,)) impactParticles
+                                    ( [], impactParticles )
                     )
     else
         Nothing
