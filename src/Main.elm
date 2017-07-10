@@ -4,7 +4,7 @@ import AnimationFrame
 import Html exposing (Html)
 import Html.Attributes
 import Keyboard
-import Random.Pcg as Random
+import Random.Pcg as Random exposing (Generator)
 import Time exposing (Time)
 
 
@@ -17,6 +17,7 @@ import Geometry.Line as Line exposing (Intersection(SegmentSegment))
 import Geometry.Matrix as Matrix exposing (Matrix)
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
+import Particle exposing (Particle)
 import Screen
 import Types exposing (Radians, Polyline, Positioned, Moving, Expiring)
 
@@ -24,7 +25,7 @@ import Types exposing (Radians, Polyline, Positioned, Moving, Expiring)
 main : Program Never Model Msg
 main =
     Html.program
-        { init = ( initialModel, Cmd.none )
+        { init = ( init (Random.initialSeed 3780540833), Cmd.none )
         , update = \msg model -> ( update msg model, Cmd.none )
         , view = view
         , subscriptions =
@@ -47,6 +48,8 @@ type alias Model =
     , player : Player
     , blaster : Blaster
     , blasts : List Blast
+    , particles : List Particle
+    , seed : Random.Seed
     , controls : Controls
     }
 
@@ -77,29 +80,31 @@ type alias Controls =
     }
 
 
-initialModel : Model
-initialModel =
-    { asteroids =
-        Random.initialSeed 3780540833
-            |> Random.step (Asteroid.field screenSize (screenWidth / 6) 10)
-            |> Tuple.first
-            |> Force.separate
-    , player =
-        { polylines = spaceship
-        , position = screenSize |> Vector.scale 0.5
-        , rotation = pi
-        , velocity = Vector.zero
-        , angularVelocity = 0
+init : Random.Seed -> Model
+init seed =
+    let
+        ( asteroids, seedNext ) =
+            seed |> Random.step (Asteroid.field screenSize (screenWidth / 6) 10)
+    in
+        { asteroids = asteroids |> Force.separate
+        , player =
+            { polylines = spaceship
+            , position = screenSize |> Vector.scale 0.5
+            , rotation = pi
+            , velocity = Vector.zero
+            , angularVelocity = 0
+            }
+        , blaster = Nothing
+        , blasts = []
+        , particles = []
+        , seed = seedNext
+        , controls =
+            { left = False
+            , right = False
+            , thrust = False
+            , fire = False
+            }
         }
-    , blaster = Nothing
-    , blasts = []
-    , controls =
-        { left = False
-        , right = False
-        , thrust = False
-        , fire = False
-        }
-    }
 
 
 
@@ -177,22 +182,29 @@ update msg ({ controls } as model) =
                 blastsNext =
                     blasterNext
                         |> Maybe.andThen (fireBlast dt playerNext)
-                        |> Maybe.map ((flip (::)) model.blasts)
-                        |> Maybe.withDefault model.blasts
+                        |> unwrap model.blasts ((flip (::)) model.blasts)
                         |> List.filterMap (updateBlast dt)
                         |> List.map wrapPosition
 
                 asteroidsNext =
                     model.asteroids |> List.map (updateMoving dt >> wrapPosition)
 
-                ( blastsNext2, asteroidsNext2 ) =
+                particlesNext =
+                    model.particles |> List.filterMap (updateMoving dt >> wrapPosition >> updateExpiring dt)
+
+                ( blastsNext2, asteroidsNext2, maybeParticles ) =
                     interactBlastsAsteroids blastsNext asteroidsNext
+
+                ( particles, seedNext ) =
+                    maybeParticles |> unwrap ( [], model.seed ) ((flip Random.step) model.seed)
             in
                 { model
                     | asteroids = asteroidsNext2
                     , player = playerNext
                     , blaster = blasterNext
                     , blasts = blastsNext2
+                    , particles = particles ++ particlesNext
+                    , seed = seedNext
                 }
 
 
@@ -314,30 +326,46 @@ updateExpiring dt obj =
 -- interactions
 
 
-interactBlastsAsteroids : List Blast -> List Asteroid -> ( List Blast, List Asteroid )
+type alias BlastAsteroidResult =
+    ( List Blast, List Asteroid, Maybe (Generator (List Particle)) )
+
+
+interactBlastsAsteroids : List Blast -> List Asteroid -> BlastAsteroidResult
 interactBlastsAsteroids blasts asteroids =
     List.foldl
         (interactBlastAsteroids [])
-        ( [], asteroids )
+        ( [], asteroids, Nothing )
         blasts
 
 
-interactBlastAsteroids : List Asteroid -> Blast -> ( List Blast, List Asteroid ) -> ( List Blast, List Asteroid )
-interactBlastAsteroids asteroidsResult blast ( blastsResult, asteroids ) =
+interactBlastAsteroids : List Asteroid -> Blast -> BlastAsteroidResult -> BlastAsteroidResult
+interactBlastAsteroids asteroidsResult blast ( blastsResult, asteroids, maybeParticles ) =
     case asteroids of
         [] ->
-            ( blast :: blastsResult, asteroidsResult )
+            ( blast :: blastsResult
+            , asteroidsResult
+            , maybeParticles
+            )
 
         asteroid :: asteroidsRest ->
             case interactBlastAsteroid blast asteroid of
-                Just asteroidDamage ->
-                    ( blastsResult, asteroidsResult ++ asteroidDamage ++ asteroidsRest )
+                Just ( asteroidDamage, particles ) ->
+                    ( blastsResult
+                    , asteroidDamage ++ asteroidsRest ++ asteroidsResult
+                    , appendMaybe (Random.map2 (++)) (Just particles) maybeParticles
+                    )
 
                 Nothing ->
-                    interactBlastAsteroids (asteroid :: asteroidsResult) blast ( blastsResult, asteroidsRest )
+                    interactBlastAsteroids
+                        (asteroid :: asteroidsResult)
+                        blast
+                        ( blastsResult
+                        , asteroidsRest
+                        , maybeParticles
+                        )
 
 
-interactBlastAsteroid : Blast -> Asteroid -> Maybe (List Asteroid)
+interactBlastAsteroid : Blast -> Asteroid -> Maybe ( List Asteroid, Generator (List Particle) )
 interactBlastAsteroid blast asteroid =
     if Vector.distanceSquared blast.position asteroid.position < asteroid.radius ^ 2 then
         let
@@ -357,6 +385,10 @@ interactBlastAsteroid blast asteroid =
                             forceSpeed =
                                 (blast.velocity |> Vector.length)
                                     * (blastMass / (blastMass + asteroid.radius ^ 2))
+
+                            impactParticles =
+                                Particle.burst 100 80 (asteroid.radius / 4 |> ceiling)
+                                    |> Random.map (List.map (adjustParticle impact asteroid.velocity))
                         in
                             Polygon.split a b asteroidPolygon
                                 |> List.map
@@ -380,6 +412,7 @@ interactBlastAsteroid blast asteroid =
                                                     + (angleFrom blastDirection forceDirection)
                                             }
                                     )
+                                |> (flip (,)) impactParticles
                     )
     else
         Nothing
@@ -388,6 +421,14 @@ interactBlastAsteroid blast asteroid =
 blastMass : Float
 blastMass =
     100
+
+
+adjustParticle : Point -> Vector -> Particle -> Particle
+adjustParticle position velocity particle =
+    { particle
+        | position = particle.position |> Vector.add position
+        , velocity = particle.velocity |> Vector.add velocity
+    }
 
 
 {-| Directed angle; assumes unit vectors.
@@ -478,13 +519,15 @@ floatModulo x y =
 
 
 view : Model -> Html a
-view { asteroids, player, blasts } =
+view { asteroids, player, blasts, particles } =
     [ asteroids
         |> List.map (transformAsteroid >> (,) True)
     , player.polylines
         |> List.map (transformPoints player.position player.rotation >> (,) False)
     , blasts
         |> List.map (blastToLine >> (,) False)
+    , particles
+        |> List.map (transformParticle >> (,) False)
     ]
         |> List.concat
         |> viewPaths
@@ -510,6 +553,16 @@ transformPoints position rotation =
         )
 
 
+transformAsteroid : Asteroid -> Polygon
+transformAsteroid { polygon, position, rotation } =
+    polygon |> transformPoints position rotation
+
+
+transformParticle : Particle -> Polyline
+transformParticle { polyline, position, rotation } =
+    polyline |> transformPoints position rotation
+
+
 blastTrailPosition : Blast -> Point
 blastTrailPosition { position, velocity, deltaTime } =
     Vector.sub position (velocity |> Vector.scale (deltaTime * 1.1))
@@ -520,11 +573,6 @@ blastToLine blast =
     [ blastTrailPosition blast
     , blast.position
     ]
-
-
-transformAsteroid : Asteroid -> Polygon
-transformAsteroid { polygon, position, rotation } =
-    polygon |> transformPoints position rotation
 
 
 
@@ -552,3 +600,19 @@ unwrap default f m =
 (>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
 (>>>) f g x y =
     g (f x y)
+
+
+appendMaybe : (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
+appendMaybe append mx my =
+    case ( mx, my ) of
+        ( Just x, Just y ) ->
+            Just (append x y)
+
+        ( Just _, Nothing ) ->
+            mx
+
+        ( Nothing, Just _ ) ->
+            my
+
+        _ ->
+            Nothing

@@ -22,7 +22,7 @@ type alias Particle =
 burst : Float -> Float -> Int -> Generator (List Particle)
 burst speed radius n =
     burstRadial speed radius n
-        |> perturbParticles (speed * 0.7) (radius * 0.7) pi (pi * 3)
+        |> perturbParticles (speed * 0.9) (radius * 0.9) pi (pi * 3)
 
 
 burstRadial : Float -> Float -> Int -> List Particle
