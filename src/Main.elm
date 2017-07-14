@@ -55,7 +55,13 @@ type alias Model =
 
 
 type alias Player =
-    Positioned (Moving { polylines : List Polyline })
+    Positioned
+        (Moving
+            { radius : Float
+            , polygon : Polygon
+            , polyline : Polyline
+            }
+        )
 
 
 {-| Represents time until next fire.
@@ -88,11 +94,13 @@ init seed =
     in
         { asteroids = asteroids |> Force.separate
         , player =
-            { polylines = spaceship
-            , position = screenSize |> Vector.scale 0.5
-            , rotation = pi
+            { position = screenSize |> Vector.scale 0.5
+            , rotation = 0
             , velocity = Vector.zero
             , angularVelocity = 0
+            , radius = spaceship.radius
+            , polygon = spaceship.hull
+            , polyline = spaceship.interior
             }
         , blaster = Nothing
         , blasts = []
@@ -217,7 +225,7 @@ fireBlast dt player timeTilFire =
                 Vector.length player.velocity + 800
         in
             { position = player.position
-            , velocity = ( speed, player.rotation + pi / 2 ) |> fromPolar
+            , velocity = ( speed, player.rotation + pi / -2 ) |> fromPolar
             , timeRemaining = screenWidth / speed
             , deltaTime = dt
             }
@@ -288,7 +296,7 @@ updatePlayer dt controls entity =
 
         positionThrust =
             if controls.thrust then
-                ( thrustDistance * dt, rotationNext + pi / 2 ) |> fromPolar
+                ( thrustDistance * dt, rotationNext + pi / -2 ) |> fromPolar
             else
                 Vector.zero
 
@@ -477,21 +485,27 @@ impactPoint a b polygon =
 -- view helpers
 
 
-spaceship : List Polyline
+spaceship : { hull : Polygon, interior : Polyline, radius : Float }
 spaceship =
-    [ [ ( 0.5, -1 )
-      , ( 0, 1 )
-      , ( -0.5, -1 )
-      , ( 0.5, -1 )
-      ]
-    , [ ( 0.5, -1 )
-      , ( 1, -0.5 )
-      , ( 0, 0 )
-      , ( -1, -0.5 )
-      , ( -0.5, -1 )
-      ]
-    ]
-        |> List.map (List.map (Vector.scale 18))
+    { hull =
+        [ ( -10, 19 )
+        , ( -18, 9 )
+        , ( -6, 3 )
+        , ( 0, -21 )
+        , ( 6, 3 )
+        , ( 18, 9 )
+        , ( 10, 19 )
+        ]
+    , interior =
+        [ ( -10, 19 )
+        , ( -6, 3 )
+        , ( 0, 0 )
+        , ( 6, 3 )
+        , ( 10, 19 )
+        ]
+    , radius =
+        22
+    }
 
 
 screenSize : ( Float, Float )
@@ -534,8 +548,8 @@ view : Model -> Html a
 view { asteroids, player, blasts, particles } =
     [ asteroids
         |> List.map (transformAsteroid >> (,) True)
-    , player.polylines
-        |> List.map (transformPoints player.position player.rotation >> (,) False)
+    , player
+        |> playerToPaths
     , blasts
         |> List.map (blastToLine >> (,) False)
     , particles
@@ -563,6 +577,17 @@ transformPoints position rotation =
         (Matrix.transform
             (Matrix.init 1 rotation position)
         )
+
+
+playerToPaths : Player -> List Screen.Path
+playerToPaths { polygon, polyline, position, rotation } =
+    let
+        transform =
+            transformPoints position rotation
+    in
+        [ ( True, polygon |> transform )
+        , ( False, polyline |> transform )
+        ]
 
 
 transformAsteroid : Asteroid -> Polygon
