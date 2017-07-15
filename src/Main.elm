@@ -45,8 +45,7 @@ main =
 
 type alias Model =
     { asteroids : List Asteroid
-    , player : Player
-    , blaster : Blaster
+    , player : Maybe Player
     , blasts : List Blast
     , particles : List Particle
     , seed : Random.Seed
@@ -60,6 +59,7 @@ type alias Player =
             { radius : Float
             , polygon : Polygon
             , polyline : Polyline
+            , blaster : Blaster
             }
         )
 
@@ -94,15 +94,16 @@ init seed =
     in
         { asteroids = asteroids |> Force.separate
         , player =
-            { position = screenSize |> Vector.scale 0.5
-            , rotation = 0
-            , velocity = Vector.zero
-            , angularVelocity = 0
-            , radius = spaceship.radius
-            , polygon = spaceship.hull
-            , polyline = spaceship.interior
-            }
-        , blaster = Nothing
+            Just
+                { position = screenSize |> Vector.scale 0.5
+                , rotation = 0
+                , velocity = Vector.zero
+                , angularVelocity = 0
+                , radius = spaceship.radius
+                , polygon = spaceship.hull
+                , polyline = spaceship.interior
+                , blaster = Nothing
+                }
         , blasts = []
         , particles = []
         , seed = seedNext
@@ -182,14 +183,12 @@ update msg ({ controls } as model) =
         Tick dt ->
             let
                 playerNext =
-                    model.player |> updatePlayer dt controls |> wrapPosition
-
-                blasterNext =
-                    model.blaster |> updateBlaster dt controls.fire
+                    model.player |> Maybe.map (updatePlayer dt controls >> wrapPosition)
 
                 blastsNext =
-                    blasterNext
-                        |> Maybe.andThen (fireBlast dt playerNext)
+                    playerNext
+                        |> Maybe.andThen
+                            (\player -> player.blaster |> Maybe.andThen (fireBlast dt player))
                         |> unwrap model.blasts ((flip (::)) model.blasts)
                         |> List.filterMap (updateBlast dt)
                         |> List.map wrapPosition
@@ -209,7 +208,6 @@ update msg ({ controls } as model) =
                 { model
                     | asteroids = asteroidsNext2
                     , player = playerNext
-                    , blaster = blasterNext
                     , blasts = blastsNext2
                     , particles = particles ++ particlesNext
                     , seed = seedNext
@@ -273,7 +271,7 @@ playerSettings =
 
 
 updatePlayer : Time -> Controls -> Player -> Player
-updatePlayer dt controls entity =
+updatePlayer dt controls player =
     let
         { thrustRadians, thrustDistance, positionFriction, rotationFriction } =
             playerSettings
@@ -290,8 +288,8 @@ updatePlayer dt controls entity =
                     0
 
         rotationNext =
-            entity.rotation
-                + (entity.angularVelocity * rotationFriction * dt)
+            player.rotation
+                + (player.angularVelocity * rotationFriction * dt)
                 + rotationThrust
 
         positionThrust =
@@ -301,15 +299,16 @@ updatePlayer dt controls entity =
                 Vector.zero
 
         positionNext =
-            entity.position
-                |> Vector.add (entity.velocity |> Vector.scale (positionFriction * dt))
+            player.position
+                |> Vector.add (player.velocity |> Vector.scale (positionFriction * dt))
                 |> Vector.add (positionThrust)
     in
-        { entity
+        { player
             | position = positionNext
             , rotation = rotationNext
-            , velocity = Vector.sub positionNext entity.position |> Vector.scale (1 / dt)
-            , angularVelocity = (rotationNext - entity.rotation) / dt
+            , velocity = Vector.sub positionNext player.position |> Vector.scale (1 / dt)
+            , angularVelocity = (rotationNext - player.rotation) / dt
+            , blaster = player.blaster |> updateBlaster dt controls.fire
         }
 
 
@@ -549,7 +548,7 @@ view { asteroids, player, blasts, particles } =
     [ asteroids
         |> List.map (transformAsteroid >> (,) True)
     , player
-        |> playerToPaths
+        |> unwrap [] playerToPaths
     , blasts
         |> List.map (blastToLine >> (,) False)
     , particles
