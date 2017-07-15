@@ -182,34 +182,39 @@ update msg ({ controls } as model) =
 
         Tick dt ->
             let
-                playerNext =
+                playerU =
                     model.player |> Maybe.map (updatePlayer dt controls >> wrapPosition)
 
-                blastsNext =
-                    playerNext
+                blastsU =
+                    playerU
                         |> Maybe.andThen
                             (\player -> player.blaster |> Maybe.andThen (fireBlast dt player))
                         |> unwrap model.blasts ((flip (::)) model.blasts)
                         |> List.filterMap (updateBlast dt)
                         |> List.map wrapPosition
 
-                asteroidsNext =
+                asteroidsU =
                     model.asteroids |> List.map (updateMoving dt >> wrapPosition)
 
-                particlesNext =
+                particlesU =
                     model.particles |> List.filterMap (updateMoving dt >> wrapPosition >> updateExpiring dt)
 
-                ( blastsNext2, asteroidsNext2, maybeParticles ) =
-                    interactBlastsAsteroids blastsNext asteroidsNext
+                ( blastsI1, asteroidsI1, maybeParticles1 ) =
+                    interactBlastsAsteroids blastsU asteroidsU
 
-                ( particles, seedNext ) =
-                    maybeParticles |> unwrap ( [], model.seed ) ((flip Random.step) model.seed)
+                ( blastsI2, playerI1, maybeParticles2 ) =
+                    playerU |> unwrap ( blastsI1, playerU, Nothing ) (interactBlastsPlayer blastsI1)
+
+                ( newParticles, seedNext ) =
+                    maybeParticles1
+                        |> appendMaybe (Random.map2 (++)) maybeParticles2
+                        |> unwrap ( [], model.seed ) ((flip Random.step) model.seed)
             in
                 { model
-                    | asteroids = asteroidsNext2
-                    , player = playerNext
-                    , blasts = blastsNext2
-                    , particles = particles ++ particlesNext
+                    | asteroids = asteroidsI1
+                    , player = playerI1
+                    , blasts = blastsI2
+                    , particles = newParticles ++ particlesU
                     , seed = seedNext
                 }
 
@@ -373,73 +378,135 @@ interactBlastAsteroids asteroidsResult blast ( blastsResult, asteroids, maybePar
 
 
 interactBlastAsteroid : Blast -> Asteroid -> Maybe ( List Asteroid, Generator (List Particle) )
-interactBlastAsteroid blast asteroid =
-    if Vector.distanceSquared blast.position asteroid.position < asteroid.radius ^ 2 then
-        let
-            asteroidPolygon =
-                asteroid |> transformAsteroid
-
-            ( a, b ) =
-                ( blast |> blastTrailPosition, blast.position )
-        in
-            impactPoint a b asteroidPolygon
-                |> Maybe.map
-                    (\impact ->
+interactBlastAsteroid =
+    interactBlastCollidable
+        (\impact asteroid ->
+            asteroid
+                |> transformPolygon
+                |> Polygon.split (impact.blast |> blastTrailPosition) impact.blast.position
+                |> List.foldl
+                    (\fragment ( fragments, particles ) ->
                         let
+                            ( fragmentPosition, fragmentRadius ) =
+                                fragment |> Circle.enclose
+
+                            forceDirection =
+                                Vector.direction impact.point fragmentPosition
+
+                            fragmentPolygon =
+                                fragment |> List.map ((flip Vector.sub) fragmentPosition)
+
+                            fragmentVelocity =
+                                asteroid.velocity |> Vector.add (forceDirection |> Vector.scale impact.forceSpeed)
+
                             blastDirection =
-                                blast.velocity |> Vector.normalize
-
-                            forceSpeed =
-                                (blast.velocity |> Vector.length)
-                                    * (blastMass / (blastMass + asteroid.radius ^ 2))
-
-                            impactParticles =
-                                Particle.burst 100 80 (asteroid.radius / 4 |> ceiling)
-                                    |> Random.map (List.map (adjustParticle impact asteroid.velocity))
+                                impact.blast.velocity |> Vector.normalize
                         in
-                            Polygon.split a b asteroidPolygon
-                                |> List.foldl
-                                    (\fragment ( fragments, particles ) ->
-                                        let
-                                            ( fragmentPosition, fragmentRadius ) =
-                                                fragment |> Circle.enclose
-
-                                            forceDirection =
-                                                Vector.direction impact fragmentPosition
-
-                                            fragmentPolygon =
-                                                fragment |> List.map ((flip Vector.sub) fragmentPosition)
-
-                                            fragmentVelocity =
-                                                asteroid.velocity |> Vector.add (forceDirection |> Vector.scale forceSpeed)
-                                        in
-                                            if fragmentRadius < 20 then
-                                                ( fragments
-                                                , Particle.explode forceSpeed forceSpeed fragmentPolygon
-                                                    |> Random.map (List.map (adjustParticle fragmentPosition fragmentVelocity))
-                                                    |> Random.map2 (++) particles
-                                                )
-                                            else
-                                                ( { polygon = fragmentPolygon
-                                                  , radius = fragmentRadius
-                                                  , position = fragmentPosition
-                                                  , rotation = 0
-                                                  , velocity = fragmentVelocity
-                                                  , angularVelocity = asteroid.angularVelocity + (angleFrom blastDirection forceDirection)
-                                                  }
-                                                    :: fragments
-                                                , particles
-                                                )
-                                    )
-                                    ( [], impactParticles )
+                            if fragmentRadius < 20 then
+                                ( fragments
+                                , Particle.explode impact.forceSpeed impact.forceSpeed fragmentPolygon
+                                    |> Random.map (List.map (adjustParticle fragmentPosition fragmentVelocity))
+                                    |> Random.map2 (++) particles
+                                )
+                            else
+                                ( { polygon = fragmentPolygon
+                                  , radius = fragmentRadius
+                                  , position = fragmentPosition
+                                  , rotation = 0
+                                  , velocity = fragmentVelocity
+                                  , angularVelocity = asteroid.angularVelocity + (angleFrom blastDirection forceDirection)
+                                  }
+                                    :: fragments
+                                , particles
+                                )
                     )
-    else
-        Nothing
+                    ( [], impact.particles )
+        )
 
 
 blastMass : Float
 blastMass =
     100
+
+
+
+--
+
+
+type alias BlastsPlayerResult =
+    ( List Blast, Maybe Player, Maybe (Generator (List Particle)) )
+
+
+interactBlastsPlayer : List Blast -> Player -> BlastsPlayerResult
+interactBlastsPlayer blasts player =
+    List.foldl
+        (\blast ( blastsResult, maybePlayer, maybeParticles ) ->
+            case maybePlayer |> Maybe.andThen (interactBlastPlayer blast) of
+                Just particles ->
+                    ( blastsResult, Nothing, Just particles )
+
+                Nothing ->
+                    ( blast :: blastsResult, maybePlayer, maybeParticles )
+        )
+        ( [], Just player, Nothing )
+        blasts
+
+
+interactBlastPlayer : Blast -> Player -> Maybe (Generator (List Particle))
+interactBlastPlayer =
+    interactBlastCollidable
+        (\impact player ->
+            Random.map2 (++)
+                (Particle.explode impact.forceSpeed impact.forceSpeed (player.polygon))
+                (Particle.explode impact.forceSpeed impact.forceSpeed (player.polyline))
+                |> Random.map (List.map (adjustParticle player.position player.velocity))
+                |> Random.map2 (++) impact.particles
+        )
+
+
+
+--
+
+
+type alias Collidable a =
+    Positioned (Moving { a | polygon : Polygon, radius : Float })
+
+
+type alias BlastImpact =
+    { blast : Blast
+    , point : Point
+    , forceSpeed : Float
+    , particles : Generator (List Particle)
+    }
+
+
+interactBlastCollidable : (BlastImpact -> Collidable a -> b) -> Blast -> Collidable a -> Maybe b
+interactBlastCollidable f blast obj =
+    if Vector.distanceSquared blast.position obj.position < obj.radius ^ 2 then
+        let
+            objPolygon =
+                obj |> transformPolygon
+
+            ( a, b ) =
+                ( blast |> blastTrailPosition, blast.position )
+        in
+            impactPoint a b objPolygon
+                |> Maybe.map
+                    (\point ->
+                        f
+                            { blast = blast
+                            , point = point
+                            , forceSpeed =
+                                (blast.velocity |> Vector.length)
+                                    * (blastMass / (blastMass + obj.radius ^ 2))
+                            , particles =
+                                Particle.burst 100 80 (obj.radius / 4 |> ceiling)
+                                    |> Random.map (List.map (adjustParticle point obj.velocity))
+                            }
+                            obj
+                    )
+    else
+        Nothing
 
 
 adjustParticle : Point -> Vector -> Particle -> Particle
@@ -448,13 +515,6 @@ adjustParticle position velocity particle =
         | position = particle.position |> Vector.add position
         , velocity = particle.velocity |> Vector.add velocity
     }
-
-
-{-| Directed angle; assumes unit vectors.
--}
-angleFrom : Vector -> Vector -> Float
-angleFrom a b =
-    atan2 (Vector.cross a b) (Vector.dot a b)
 
 
 impactPoint : Point -> Point -> Polygon -> Maybe Point
@@ -478,6 +538,13 @@ impactPoint a b polygon =
 
             points ->
                 (a < b |> either List.minimum List.maximum) points
+
+
+{-| Directed angle; assumes unit vectors.
+-}
+angleFrom : Vector -> Vector -> Float
+angleFrom a b =
+    atan2 (Vector.cross a b) (Vector.dot a b)
 
 
 
@@ -546,7 +613,7 @@ floatModulo x y =
 view : Model -> Html a
 view { asteroids, player, blasts, particles } =
     [ asteroids
-        |> List.map (transformAsteroid >> (,) True)
+        |> List.map (transformPolygon >> (,) True)
     , player
         |> unwrap [] playerToPaths
     , blasts
@@ -589,8 +656,8 @@ playerToPaths { polygon, polyline, position, rotation } =
         ]
 
 
-transformAsteroid : Asteroid -> Polygon
-transformAsteroid { polygon, position, rotation } =
+transformPolygon : Positioned { a | polygon : Polygon } -> Polygon
+transformPolygon { polygon, position, rotation } =
     polygon |> transformPoints position rotation
 
 
