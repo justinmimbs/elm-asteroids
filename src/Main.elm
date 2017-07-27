@@ -203,16 +203,19 @@ update msg ({ controls } as model) =
                     interactBlastsAsteroids blastsU asteroidsU
 
                 ( blastsI2, playerI1, maybeParticles2 ) =
-                    playerU |> unwrap ( blastsI1, playerU, Nothing ) (interactBlastsPlayer blastsI1)
+                    playerU |> unwrap ( blastsI1, Nothing, Nothing ) (interactBlastsPlayer blastsI1)
+
+                ( asteroidsI2, playerI2, maybeParticles3 ) =
+                    playerI1 |> unwrap ( asteroidsI1, Nothing, Nothing ) (interactAsteroidsPlayer asteroidsI1)
 
                 ( newParticles, seedNext ) =
-                    maybeParticles1
-                        |> appendMaybe (Random.map2 (++)) maybeParticles2
+                    [ maybeParticles1, maybeParticles2, maybeParticles3 ]
+                        |> List.foldl (appendMaybe (Random.map2 (++))) Nothing
                         |> unwrap ( [], model.seed ) ((flip Random.step) model.seed)
             in
                 { model
-                    | asteroids = asteroidsI1
-                    , player = playerI1
+                    | asteroids = asteroidsI2
+                    , player = playerI2
                     , blasts = blastsI2
                     , particles = newParticles ++ particlesU
                     , seed = seedNext
@@ -433,11 +436,11 @@ blastMass =
 --
 
 
-type alias BlastsPlayerResult =
+type alias BlastPlayerResult =
     ( List Blast, Maybe Player, Maybe (Generator (List Particle)) )
 
 
-interactBlastsPlayer : List Blast -> Player -> BlastsPlayerResult
+interactBlastsPlayer : List Blast -> Player -> BlastPlayerResult
 interactBlastsPlayer blasts player =
     List.foldl
         (\blast ( blastsResult, maybePlayer, maybeParticles ) ->
@@ -519,25 +522,77 @@ adjustParticle position velocity particle =
 
 impactPoint : Point -> Point -> Polygon -> Maybe Point
 impactPoint a b polygon =
-    let
-        intersections =
-            Polygon.fold
-                (Line.intersect SegmentSegment a b >>> unwrap identity (::))
-                []
-                polygon
-    in
-        case intersections of
-            [] ->
+    case intersectionsPolygonSegment polygon a b of
+        [] ->
+            Nothing
+
+        [ p ] ->
+            Just p
+
+        [ p, q ] ->
+            Just ((a < b |> either min max) p q)
+
+        points ->
+            (a < b |> either List.minimum List.maximum) points
+
+
+
+--
+
+
+type alias AsteroidPlayerResult =
+    ( List Asteroid, Maybe Player, Maybe (Generator (List Particle)) )
+
+
+interactAsteroidsPlayer : List Asteroid -> Player -> AsteroidPlayerResult
+interactAsteroidsPlayer asteroids player =
+    List.foldl
+        (\asteroid ( asteroidsResult, maybePlayer, maybeParticles ) ->
+            case maybePlayer |> Maybe.andThen (interactAsteroidPlayer asteroid) of
+                Just ( asteroid2, particles ) ->
+                    ( asteroid2 :: asteroidsResult, Nothing, Just particles )
+
+                Nothing ->
+                    ( asteroid :: asteroidsResult, maybePlayer, maybeParticles )
+        )
+        ( [], Just player, Nothing )
+        asteroids
+
+
+interactAsteroidPlayer : Asteroid -> Player -> Maybe ( Asteroid, Generator (List Particle) )
+interactAsteroidPlayer asteroid player =
+    if Vector.distance asteroid.position player.position < asteroid.radius + player.radius then
+        let
+            intersections =
+                intersectionsPolygonPolygon
+                    (transformPolygon player)
+                    (transformPolygon asteroid)
+        in
+            if intersections |> Debug.log "int" |> List.isEmpty then
                 Nothing
+            else
+                Just ( asteroid, Random.constant [] )
+    else
+        Nothing
 
-            [ p ] ->
-                Just p
 
-            [ p, q ] ->
-                Just ((a < b |> either min max) p q)
 
-            points ->
-                (a < b |> either List.minimum List.maximum) points
+--
+
+
+intersectionsPolygonSegment : Polygon -> Point -> Point -> List Point
+intersectionsPolygonSegment polygon a b =
+    Polygon.fold
+        (Line.intersect SegmentSegment a b >>> unwrap identity (::))
+        []
+        polygon
+
+
+intersectionsPolygonPolygon : Polygon -> Polygon -> List Point
+intersectionsPolygonPolygon polygon =
+    Polygon.fold
+        (intersectionsPolygonSegment polygon >>> (++))
+        []
 
 
 {-| Directed angle; assumes unit vectors.
