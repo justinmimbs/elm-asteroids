@@ -32,23 +32,18 @@ burstRadial speed radius n =
             (pi * 2) / toFloat n
     in
         List.range 1 n
-            |> List.map (toFloat >> (*) sectionAngle >> burstRadialParticle speed radius)
+            |> List.map (\i -> burstRadialParticle speed radius (toFloat (i % 3 + 1)) (toFloat i * sectionAngle))
 
 
-burstRadialParticle : Float -> Float -> Radians -> Particle
-burstRadialParticle speed distance angle =
+burstRadialParticle : Float -> Float -> Float -> Radians -> Particle
+burstRadialParticle speed distance halfLength angle =
     { position = Vector.zero
     , rotation = angle
     , velocity = ( speed, angle ) |> fromPolar
     , angularVelocity = 0
     , timeRemaining = distance / speed
-    , polyline = burstRadialParticleLine
+    , polyline = [ ( negate halfLength, 0 ), ( halfLength, 0 ) ]
     }
-
-
-burstRadialParticleLine : Polyline
-burstRadialParticleLine =
-    [ ( -2, 0 ), ( 2, 0 ) ]
 
 
 
