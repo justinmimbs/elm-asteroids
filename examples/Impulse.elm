@@ -84,7 +84,7 @@ update msg ({ drag, disk } as model) =
                 Just ( p0, p1 ) ->
                     let
                         ( vel, ang ) =
-                            impulse (Vector.sub p0 p1) p0 disk.position
+                            impulse (Vector.sub p1 p0) p1 disk.position
 
                         diskNext =
                             { disk
@@ -110,21 +110,23 @@ impulse velocity contact center =
         speed =
             Vector.length velocity
 
-        circum =
-            2 * pi * (Vector.distance center contact)
-
         angle =
             angleFrom (Vector.normalize velocity) direction
 
         angSpeed =
-            (speed / circum) * 2 * pi * signum angle
+            (speed / (Vector.distance center contact)) * signum angle
 
         -- rotation alpha
         t =
             abs angle / (pi / 2)
     in
         ( direction |> Vector.scale (speed * (1 - t))
-        , angSpeed * t
+        , angSpeed
+            * (if t > 1 then
+                2 - t
+               else
+                t
+              )
         )
 
 

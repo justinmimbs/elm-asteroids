@@ -25,7 +25,7 @@ init =
               , toDisk ( 600, 400 ) ( 0, 0 ) 0
               ]
             , [ toDisk ( 100, 100 ) ( 300, 300 ) (pi / 3)
-              , toDisk ( 300, 300 ) ( 100, 100 ) 0
+              , toDisk ( 300, 300 ) ( 200, 200 ) 0
               ]
             , [ toDisk ( 300, 100 ) ( 300, 330 ) 0
               , toDisk ( 600, 400 ) ( 0, 0 ) 0
@@ -42,7 +42,7 @@ init =
             , [ toDisk ( 300, 100 ) ( 250, 100 ) (pi / 3)
               , toDisk ( 900, 100 ) ( -250, 100 ) (pi / -3)
               ]
-            , [ toDisk ( 300, 100 ) ( 350, 260 ) (pi / -5)
+            , [ toDisk ( 300, 100 ) ( 350, 270 ) (pi / -5)
               , toDisk ( 900, 700 ) ( -150, -150 ) (pi / 2)
               ]
             ]
@@ -125,7 +125,7 @@ updateDisks : Time -> List Disk -> List Disk
 updateDisks dt disks =
     case disks |> List.map (updateMoving dt >> wrapPosition) of
         [ a, b ] ->
-            case collide 1 (a.radius ^ 2) (b.radius ^ 2) a b of
+            case collide 0.9 (a.radius ^ 2) (b.radius ^ 2) a b of
                 Just ( a2, b2 ) ->
                     [ a2, b2 ]
 
@@ -176,20 +176,19 @@ meanPoint points =
 collideAtPoint : Float -> Float -> Float -> Collidable a -> Collidable b -> Point -> Maybe ( Collidable a, Collidable b )
 collideAtPoint e aMass bMass a b contact =
     let
-        -- TODO clean this up
-        ( aSpeed, aAngle ) =
-            a.velocity |> toPolar
+        aSpeed =
+            a.velocity |> Vector.length
 
-        ( bSpeed, bAngle ) =
-            b.velocity |> toPolar
+        bSpeed =
+            b.velocity |> Vector.length
 
         aToward =
-            Vector.sub contact a.position |> toPolar |> Tuple.second |> (-) aAngle |> abs |> (>) (pi / 2)
+            angleBetween a.velocity (Vector.sub contact a.position) < pi / 2
 
         bToward =
-            Vector.sub contact b.position |> toPolar |> Tuple.second |> (-) bAngle |> abs |> (>) (pi / 2)
+            angleBetween b.velocity (Vector.sub contact b.position) < pi / 2
     in
-        if aToward && bToward || aToward && aSpeed >= bSpeed || bToward && bSpeed >= aSpeed then
+        if aToward && bToward || aToward && aSpeed > bSpeed || bToward && bSpeed > aSpeed then
             let
                 t =
                     aMass / (aMass + bMass)
@@ -206,23 +205,26 @@ collideAtPoint e aMass bMass a b contact =
                 ( bPush, bSpin ) =
                     b.position |> impulse a.velocity contact
 
-                inelastic =
+                inelasticVel =
                     Vector.interpolate t b.velocity a.velocity
+
+                inelasticAngVel =
+                    interpolate t b.angularVelocity a.angularVelocity
             in
                 Just
                     ( { a
                         | velocity =
                             Vector.interpolate e
-                                inelastic
+                                inelasticVel
                                 (a.velocity |> Vector.interpolate (0 + t) aReflect |> Vector.add (aPush |> Vector.scale ((1 - t) * 2)))
-                        , angularVelocity = a.angularVelocity + aSpin -- interpolate (1 - t) a.angularVelocity aSpin
+                        , angularVelocity = interpolate e inelasticAngVel (a.angularVelocity |> interpolate (0 + t) aSpin)
                       }
                     , { b
                         | velocity =
                             Vector.interpolate e
-                                inelastic
+                                inelasticVel
                                 (b.velocity |> Vector.interpolate (1 - t) bReflect |> Vector.add (bPush |> Vector.scale ((0 + t) * 2)))
-                        , angularVelocity = b.angularVelocity + bSpin -- interpolate (1 - t) b.angularVelocity bSpin
+                        , angularVelocity = interpolate e inelasticAngVel (b.angularVelocity |> interpolate (1 - t) bSpin)
                       }
                     )
         else
@@ -243,28 +245,40 @@ impulse velocity contact center =
         speed =
             Vector.length velocity
 
-        circum =
-            2 * pi * (Vector.distance center contact)
-
         angle =
             angleFrom (Vector.normalize velocity) direction
 
         angSpeed =
-            (speed / circum) * 2 * pi * signum angle
+            (speed / (Vector.distance center contact)) * signum angle
 
         -- rotation alpha
         t =
             abs angle / (pi / 2)
     in
         ( direction |> Vector.scale (speed * (1 - t))
-        , angSpeed * t
+        , angSpeed
+            * (if t > 1 then
+                2 - t
+               else
+                t
+              )
         )
+
+
+on : (a -> b) -> (b -> b -> c) -> a -> a -> c
+on f g x y =
+    g (f x) (f y)
+
+
+angleBetween : Vector -> Vector -> Float
+angleBetween =
+    angleBetweenUnit |> on Vector.normalize
 
 
 {-| Assumes unit vectors.
 -}
-angleBetween : Vector -> Vector -> Float
-angleBetween a b =
+angleBetweenUnit : Vector -> Vector -> Float
+angleBetweenUnit a b =
     acos (Vector.dot a b)
 
 
