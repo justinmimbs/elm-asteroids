@@ -8,13 +8,30 @@ import Time exposing (Time)
 
 -- project modules
 
-import Geometry.Force as Force
-import Geometry.Line as Line exposing (Intersection(SegmentSegment))
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
 import Main exposing (viewPaths, transformPoints, wrapPosition, updateMoving)
+import Physics exposing (Movement)
 import Screen
 import Types exposing (Moving, Positioned, Radians)
+
+
+main : Program Never (List (List Disk)) Msg
+main =
+    Html.program
+        { init = ( init, Cmd.none )
+        , update = \x r -> ( update x r, Cmd.none )
+        , view =
+            List.head
+                >> Maybe.map (List.map (transformPolygon >> (,) True) >> viewPaths)
+                >> Maybe.withDefault (Html.text "")
+        , subscriptions =
+            Sub.batch
+                [ AnimationFrame.diffs (Tick << Time.inSeconds)
+                , Mouse.downs (always Next)
+                ]
+                |> always
+        }
 
 
 init : List (List Disk)
@@ -62,35 +79,12 @@ toPair a b pair =
             []
 
 
-main : Program Never (List (List Disk)) Msg
-main =
-    Html.program
-        { init = ( init, Cmd.none )
-        , update = \x r -> ( update x r, Cmd.none )
-        , view =
-            List.head
-                >> Maybe.map (List.map (transformPolygon >> (,) True) >> viewPaths)
-                >> Maybe.withDefault (Html.text "")
-        , subscriptions =
-            Sub.batch
-                [ AnimationFrame.diffs (Tick << Time.inSeconds)
-                , Mouse.downs (always Next)
-                ]
-                |> always
-        }
-
-
-type Msg
-    = Tick Time
-    | Next
-
-
 
 --
 
 
 type alias Disk =
-    Moving (Positioned { radius : Float, polygon : Polygon })
+    Moving (Positioned { radius : Float, polygon : Polygon, mass : Float })
 
 
 toDisk : Point -> Vector -> Radians -> Float -> Disk
@@ -101,11 +95,17 @@ toDisk p v a radius =
     , rotation = 0
     , velocity = v
     , angularVelocity = a
+    , mass = radius ^ 2
     }
 
 
 
 --
+
+
+type Msg
+    = Tick Time
+    | Next
 
 
 update : Msg -> List (List Disk) -> List (List Disk)
@@ -125,9 +125,11 @@ updateDisks : Time -> List Disk -> List Disk
 updateDisks dt disks =
     case disks |> List.map (updateMoving dt >> wrapPosition) of
         [ a, b ] ->
-            case collide 0.9 (a.radius ^ 2) (b.radius ^ 2) a b of
-                Just ( a2, b2 ) ->
-                    [ a2, b2 ]
+            case Physics.collide 0.9 { a | polygon = transformPolygon a } { b | polygon = transformPolygon b } of
+                Just ( ma, mb ) ->
+                    [ a |> setMovement ma
+                    , b |> setMovement mb
+                    ]
 
                 Nothing ->
                     [ a, b ]
@@ -136,208 +138,11 @@ updateDisks dt disks =
             x
 
 
-
---
-
-
-type alias Collidable a =
-    Positioned (Moving { a | polygon : Polygon, radius : Float })
-
-
-collide : Float -> Float -> Float -> Collidable a -> Collidable b -> Maybe ( Collidable a, Collidable b )
-collide e aMass bMass a b =
-    contactPoint a b |> Maybe.map (Debug.log "contact") |> Maybe.andThen (collideAtPoint e aMass bMass a b)
-
-
-contactPoint : Collidable a -> Collidable b -> Maybe Point
-contactPoint a b =
-    if Vector.distance a.position b.position < a.radius + b.radius then
-        intersectionsPolygonPolygon
-            (transformPolygon b)
-            (transformPolygon a)
-            |> meanPoint
-    else
-        Nothing
-
-
-meanPoint : List Point -> Maybe Point
-meanPoint points =
-    case points of
-        head :: tail ->
-            tail
-                |> List.foldl (\x ( r, n ) -> ( Vector.add x r, n + 1 )) ( head, 1 )
-                |> (\( r, n ) -> Vector.scale (1 / n) r)
-                |> Just
-
-        _ ->
-            Nothing
-
-
-collideAtPoint : Float -> Float -> Float -> Collidable a -> Collidable b -> Point -> Maybe ( Collidable a, Collidable b )
-collideAtPoint e aMass bMass a b contact =
-    let
-        aSpeed =
-            a.velocity |> Vector.length
-
-        bSpeed =
-            b.velocity |> Vector.length
-
-        aToward =
-            angleBetween a.velocity (Vector.sub contact a.position) < pi / 2
-
-        bToward =
-            angleBetween b.velocity (Vector.sub contact b.position) < pi / 2
-    in
-        if aToward && bToward || aToward && aSpeed > bSpeed || bToward && bSpeed > aSpeed then
-            let
-                t =
-                    aMass / (aMass + bMass)
-
-                aReflect =
-                    a.velocity |> reflect (Vector.direction b.position a.position)
-
-                bReflect =
-                    b.velocity |> reflect (Vector.direction a.position b.position)
-
-                ( aPush, aSpin ) =
-                    a.position |> impulse b.velocity contact
-
-                ( bPush, bSpin ) =
-                    b.position |> impulse a.velocity contact
-
-                inelasticVel =
-                    Vector.interpolate t b.velocity a.velocity
-
-                inelasticAngVel =
-                    interpolate t b.angularVelocity a.angularVelocity
-            in
-                Just
-                    ( { a
-                        | velocity =
-                            Vector.interpolate e
-                                inelasticVel
-                                (a.velocity |> Vector.interpolate (0 + t) aReflect |> Vector.add (aPush |> Vector.scale ((1 - t) * 2)))
-                        , angularVelocity = interpolate e inelasticAngVel (a.angularVelocity |> interpolate (0 + t) aSpin)
-                      }
-                    , { b
-                        | velocity =
-                            Vector.interpolate e
-                                inelasticVel
-                                (b.velocity |> Vector.interpolate (1 - t) bReflect |> Vector.add (bPush |> Vector.scale ((0 + t) * 2)))
-                        , angularVelocity = interpolate e inelasticAngVel (b.angularVelocity |> interpolate (1 - t) bSpin)
-                      }
-                    )
-        else
-            Nothing
-
-
-reflect : Vector -> Vector -> Vector
-reflect normal vector =
-    Vector.sub vector (normal |> Vector.scale (2 * Vector.dot normal vector))
-
-
-impulse : Vector -> Point -> Point -> ( Vector, Radians )
-impulse velocity contact center =
-    let
-        direction =
-            Vector.direction contact center
-
-        speed =
-            Vector.length velocity
-
-        angle =
-            angleFrom (Vector.normalize velocity) direction
-
-        angSpeed =
-            (speed / (Vector.distance center contact)) * signum angle
-
-        -- rotation alpha
-        t =
-            abs angle / (pi / 2)
-    in
-        ( direction |> Vector.scale (speed * (1 - t))
-        , angSpeed
-            * (if t > 1 then
-                2 - t
-               else
-                t
-              )
-        )
-
-
-on : (a -> b) -> (b -> b -> c) -> a -> a -> c
-on f g x y =
-    g (f x) (f y)
-
-
-angleBetween : Vector -> Vector -> Float
-angleBetween =
-    angleBetweenUnit |> on Vector.normalize
-
-
-{-| Assumes unit vectors.
--}
-angleBetweenUnit : Vector -> Vector -> Float
-angleBetweenUnit a b =
-    acos (Vector.dot a b)
-
-
-{-| Directed angle; assumes unit vectors.
--}
-angleFrom : Vector -> Vector -> Float
-angleFrom a b =
-    atan2 (Vector.cross a b) (Vector.dot a b)
-
-
-signum : Float -> Float
-signum x =
-    if x > 0 then
-        1
-    else if x == 0 then
-        0
-    else
-        -1
-
-
-interpolate : Float -> Float -> Float -> Float
-interpolate t a b =
-    (a * (1 - t)) + (b * t)
-
-
-
--- duplicated
-
-
-intersectionsPolygonSegment : Polygon -> Point -> Point -> List Point
-intersectionsPolygonSegment polygon a b =
-    Polygon.fold
-        (Line.intersect SegmentSegment a b >>> unwrap identity (::))
-        []
-        polygon
-
-
-intersectionsPolygonPolygon : Polygon -> Polygon -> List Point
-intersectionsPolygonPolygon polygon =
-    Polygon.fold
-        (intersectionsPolygonSegment polygon >>> (++))
-        []
+setMovement : Movement -> Moving a -> Moving a
+setMovement ( v, av ) a =
+    { a | velocity = v, angularVelocity = av }
 
 
 transformPolygon : Positioned { a | polygon : Polygon } -> Polygon
 transformPolygon { polygon, position, rotation } =
     polygon |> transformPoints position rotation
-
-
-unwrap : b -> (a -> b) -> Maybe a -> b
-unwrap default f m =
-    case m of
-        Just x ->
-            f x
-
-        Nothing ->
-            default
-
-
-(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
-(>>>) f g x y =
-    g (f x y)

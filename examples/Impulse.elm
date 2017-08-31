@@ -14,6 +14,7 @@ import Time exposing (Time)
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
 import Main exposing (transformPoints, wrapPosition, updateMoving, updateExpiring)
+import Physics exposing (Movement)
 import Screen
 import Types exposing (Moving, Positioned, Radians)
 
@@ -82,17 +83,10 @@ update msg ({ drag, disk } as model) =
         MouseUp ->
             case drag of
                 Just ( p0, p1 ) ->
-                    let
-                        ( vel, ang ) =
-                            impulse (Vector.sub p1 p0) p1 disk.position
-
-                        diskNext =
-                            { disk
-                                | velocity = disk.velocity |> Vector.add vel
-                                , angularVelocity = disk.angularVelocity + ang
-                            }
-                    in
-                        { model | drag = Nothing, disk = diskNext }
+                    { model
+                        | drag = Nothing
+                        , disk = disk |> addMovement (Physics.impulse (Vector.sub p1 p0) p1 disk.position)
+                    }
 
                 Nothing ->
                     model
@@ -101,50 +95,9 @@ update msg ({ drag, disk } as model) =
             { model | disk = model.disk |> updateMoving dt |> wrapPosition }
 
 
-impulse : Vector -> Point -> Point -> ( Vector, Radians )
-impulse velocity contact center =
-    let
-        direction =
-            Vector.direction contact center
-
-        speed =
-            Vector.length velocity
-
-        angle =
-            angleFrom (Vector.normalize velocity) direction
-
-        angSpeed =
-            (speed / (Vector.distance center contact)) * signum angle
-
-        -- rotation alpha
-        t =
-            abs angle / (pi / 2)
-    in
-        ( direction |> Vector.scale (speed * (1 - t))
-        , angSpeed
-            * (if t > 1 then
-                2 - t
-               else
-                t
-              )
-        )
-
-
-{-| Directed angle; assumes unit vectors.
--}
-angleFrom : Vector -> Vector -> Float
-angleFrom a b =
-    atan2 (Vector.cross a b) (Vector.dot a b)
-
-
-signum : Float -> Float
-signum x =
-    if x > 0 then
-        1
-    else if x == 0 then
-        0
-    else
-        -1
+addMovement : Movement -> Moving a -> Moving a
+addMovement ( v, av ) a =
+    { a | velocity = a.velocity |> Vector.add v, angularVelocity = a.angularVelocity + av }
 
 
 

@@ -1,6 +1,6 @@
-module Geometry.Polygon exposing (Polygon, ngon, fold, toSegments, split)
+module Geometry.Polygon exposing (Polygon, ngon, fold, toSegments, split, intersectionsWithSegment, intersectionsWithPolygon)
 
-import Geometry.Line as Line exposing (Intersection(LineSegment))
+import Geometry.Line as Line exposing (Intersection(LineSegment, SegmentSegment))
 import Geometry.Vector exposing (Point)
 
 
@@ -152,7 +152,35 @@ fromSplitPoints ( working, waiting, completed ) list =
 
 
 
+-- intersections
+
+
+intersectionsWithSegment : Point -> Point -> Polygon -> List Point
+intersectionsWithSegment a b =
+    fold
+        (Line.intersect SegmentSegment a b >>> unwrap identity (::))
+        []
+
+
+intersectionsWithPolygon : Polygon -> Polygon -> List Point
+intersectionsWithPolygon polygon =
+    fold
+        (\a b -> intersectionsWithSegment a b polygon |> (++))
+        []
+
+
+
 --
+
+
+unwrap : b -> (a -> b) -> Maybe a -> b
+unwrap default f m =
+    case m of
+        Just x ->
+            f x
+
+        Nothing ->
+            default
 
 
 (>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d

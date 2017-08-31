@@ -1,4 +1,24 @@
-module Geometry.Vector exposing (Vector, Point, zero, length, lengthSquared, angle, normalize, negate, scale, add, sub, dot, cross, distance, distanceSquared, direction, interpolate)
+module Geometry.Vector
+    exposing
+        ( Vector
+        , Point
+        , zero
+        , length
+        , lengthSquared
+        , angle
+        , normalize
+        , negate
+        , scale
+        , add
+        , sub
+        , dot
+        , cross
+        , distance
+        , distanceSquared
+        , direction
+        , reflect
+        , interpolate
+        )
 
 
 type alias Vector =
@@ -94,6 +114,11 @@ distanceSquared ( x, y ) ( u, v ) =
 direction : Point -> Point -> Vector
 direction a b =
     sub b a |> normalize
+
+
+reflect : Vector -> Vector -> Vector
+reflect normal vector =
+    sub vector (normal |> scale (2 * dot normal vector))
 
 
 interpolate : Float -> Vector -> Vector -> Vector
