@@ -14,10 +14,11 @@ import Asteroid exposing (Asteroid)
 import Geometry.Circle as Circle
 import Geometry.Force as Force
 import Geometry.Line as Line exposing (Intersection(SegmentSegment))
-import Geometry.Matrix as Matrix exposing (Matrix)
+import Geometry.Matrix as Matrix
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
 import Particle exposing (Particle)
+import Physics
 import Screen
 import Types exposing (Radians, Polyline, Positioned, Moving, Expiring)
 
@@ -393,21 +394,19 @@ interactBlastAsteroid =
                             ( fragmentPosition, fragmentRadius ) =
                                 fragment |> Circle.enclose
 
-                            forceDirection =
-                                Vector.direction impact.point fragmentPosition
-
                             fragmentPolygon =
                                 fragment |> List.map ((flip Vector.sub) fragmentPosition)
 
-                            fragmentVelocity =
-                                asteroid.velocity |> Vector.add (forceDirection |> Vector.scale impact.forceSpeed)
+                            forceVelocity =
+                                impact.blast.velocity |> Vector.normalize |> Vector.scale impact.forceSpeed
 
-                            blastDirection =
-                                impact.blast.velocity |> Vector.normalize
+                            ( fragmentVelocity, fragmentAngularVelocity ) =
+                                Physics.impulse forceVelocity impact.point fragmentPosition
                         in
                             if fragmentRadius < 20 then
                                 ( fragments
-                                , Particle.explode impact.forceSpeed impact.forceSpeed fragmentPolygon
+                                , fragmentPolygon
+                                    |> Particle.explode impact.forceSpeed impact.forceSpeed
                                     |> Random.map (List.map (adjustParticle fragmentPosition fragmentVelocity))
                                     |> Random.map2 (++) particles
                                 )
@@ -416,8 +415,8 @@ interactBlastAsteroid =
                                   , radius = fragmentRadius
                                   , position = fragmentPosition
                                   , rotation = 0
-                                  , velocity = fragmentVelocity
-                                  , angularVelocity = asteroid.angularVelocity + (angleFrom blastDirection forceDirection)
+                                  , velocity = asteroid.velocity |> Vector.add fragmentVelocity
+                                  , angularVelocity = asteroid.angularVelocity + fragmentAngularVelocity
                                   }
                                     :: fragments
                                 , particles
@@ -522,7 +521,7 @@ adjustParticle position velocity particle =
 
 impactPoint : Point -> Point -> Polygon -> Maybe Point
 impactPoint a b polygon =
-    case intersectionsPolygonSegment polygon a b of
+    case polygon |> Polygon.intersectionsWithSegment a b of
         [] ->
             Nothing
 
@@ -564,7 +563,7 @@ interactAsteroidPlayer asteroid player =
     if Vector.distance asteroid.position player.position < asteroid.radius + player.radius then
         let
             intersections =
-                intersectionsPolygonPolygon
+                Polygon.intersectionsWithPolygon
                     (transformPolygon player)
                     (transformPolygon asteroid)
         in
@@ -574,32 +573,6 @@ interactAsteroidPlayer asteroid player =
                 Just ( asteroid, Random.constant [] )
     else
         Nothing
-
-
-
---
-
-
-intersectionsPolygonSegment : Polygon -> Point -> Point -> List Point
-intersectionsPolygonSegment polygon a b =
-    Polygon.fold
-        (Line.intersect SegmentSegment a b >>> unwrap identity (::))
-        []
-        polygon
-
-
-intersectionsPolygonPolygon : Polygon -> Polygon -> List Point
-intersectionsPolygonPolygon polygon =
-    Polygon.fold
-        (intersectionsPolygonSegment polygon >>> (++))
-        []
-
-
-{-| Directed angle; assumes unit vectors.
--}
-angleFrom : Vector -> Vector -> Float
-angleFrom a b =
-    atan2 (Vector.cross a b) (Vector.dot a b)
 
 
 
