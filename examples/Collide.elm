@@ -11,7 +11,7 @@ import Time exposing (Time)
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
 import Main exposing (viewPaths, transformPoints, wrapPosition, updateMoving)
-import Physics exposing (Movement)
+import Physics exposing (Movement, Collidable)
 import Screen
 import Types exposing (Moving, Positioned, Radians)
 
@@ -84,7 +84,7 @@ toPair a b pair =
 
 
 type alias Disk =
-    Moving (Positioned { radius : Float, polygon : Polygon, mass : Float })
+    Collidable {}
 
 
 toDisk : Point -> Vector -> Radians -> Float -> Disk
@@ -95,7 +95,6 @@ toDisk p v a radius =
     , rotation = 0
     , velocity = v
     , angularVelocity = a
-    , mass = radius ^ 2
     }
 
 
@@ -125,7 +124,7 @@ updateDisks : Time -> List Disk -> List Disk
 updateDisks dt disks =
     case disks |> List.map (updateMoving dt >> wrapPosition) of
         [ a, b ] ->
-            case Physics.collide 0.9 { a | polygon = transformPolygon a } { b | polygon = transformPolygon b } of
+            case Physics.collide 0.9 a b of
                 Just ( ma, mb ) ->
                     [ a |> setMovement ma
                     , b |> setMovement mb

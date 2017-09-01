@@ -18,7 +18,7 @@ import Geometry.Matrix as Matrix
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
 import Particle exposing (Particle)
-import Physics
+import Physics exposing (Movement, Collidable)
 import Screen
 import Types exposing (Radians, Polyline, Positioned, Moving, Expiring)
 
@@ -459,19 +459,29 @@ interactBlastPlayer =
     interactBlastCollidable
         (\impact player ->
             Random.map2 (++)
-                (Particle.explode impact.forceSpeed impact.forceSpeed (player.polygon))
-                (Particle.explode impact.forceSpeed impact.forceSpeed (player.polyline))
-                |> Random.map (List.map (adjustParticle player.position player.velocity))
-                |> Random.map2 (++) impact.particles
+                (player |> explodePlayer impact.forceSpeed)
+                impact.particles
         )
+
+
+explodePlayer : Float -> Player -> Generator (List Particle)
+explodePlayer speed player =
+    let
+        spaceshipPieces =
+            Random.map2 (++)
+                (Particle.explode speed speed (player.polygon))
+                (Particle.explode speed speed (player.polyline))
+                |> Random.map (List.map (adjustParticle player.position player.velocity))
+
+        burst =
+            Particle.burst 150 120 18
+                |> Random.map (List.map (adjustParticle player.position (player.velocity |> Vector.scale 0.5)))
+    in
+        Random.map2 (++) spaceshipPieces burst
 
 
 
 --
-
-
-type alias Collidable a =
-    Positioned (Moving { a | polygon : Polygon, radius : Float })
 
 
 type alias BlastImpact =
@@ -560,19 +570,21 @@ interactAsteroidsPlayer asteroids player =
 
 interactAsteroidPlayer : Asteroid -> Player -> Maybe ( Asteroid, Generator (List Particle) )
 interactAsteroidPlayer asteroid player =
-    if Vector.distance asteroid.position player.position < asteroid.radius + player.radius then
-        let
-            intersections =
-                Polygon.intersectionsWithPolygon
-                    (transformPolygon player)
-                    (transformPolygon asteroid)
-        in
-            if intersections |> Debug.log "int" |> List.isEmpty then
-                Nothing
-            else
-                Just ( asteroid, Random.constant [] )
-    else
-        Nothing
+    Physics.collide 0.2 asteroid player
+        |> Maybe.map
+            (\( aMovement, pMovement ) ->
+                ( asteroid
+                    |> setMovement aMovement
+                , player
+                    |> setMovement pMovement
+                    |> explodePlayer ((Vector.length asteroid.velocity + Vector.length player.velocity) / 4 + 50)
+                )
+            )
+
+
+setMovement : Movement -> Moving a -> Moving a
+setMovement ( v, av ) a =
+    { a | velocity = v, angularVelocity = av }
 
 
 

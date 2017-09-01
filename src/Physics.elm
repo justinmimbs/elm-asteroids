@@ -1,5 +1,6 @@
 module Physics exposing (Movement, impulse, Collidable, collide)
 
+import Geometry.Matrix as Matrix
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
 
@@ -48,9 +49,9 @@ type alias Collidable a =
         | radius : Float
         , polygon : Polygon
         , position : Point
+        , rotation : Radians
         , velocity : Vector
         , angularVelocity : Radians
-        , mass : Float
     }
 
 
@@ -62,8 +63,9 @@ collide e a b =
 contactPoint : Collidable a -> Collidable b -> Maybe Point
 contactPoint a b =
     if Vector.distance a.position b.position < a.radius + b.radius then
-        a.polygon
-            |> Polygon.intersectionsWithPolygon b.polygon
+        Polygon.intersectionsWithPolygon
+            (transformPolygon a)
+            (transformPolygon b)
             |> meanPoint
     else
         Nothing
@@ -99,8 +101,11 @@ collideAtPoint e a b contact =
     in
         if aToward && bToward || aToward && aSpeed > bSpeed || bToward && bSpeed > aSpeed then
             let
+                ( aMass, bMass ) =
+                    ( a.radius ^ 2, b.radius ^ 2 )
+
                 t =
-                    a.mass / (a.mass + b.mass)
+                    aMass / (aMass + bMass)
 
                 aReflect =
                     a.velocity |> Vector.reflect (Vector.direction b.position a.position)
@@ -140,6 +145,13 @@ collideAtPoint e a b contact =
                     )
         else
             Nothing
+
+
+transformPolygon : Collidable a -> Polygon
+transformPolygon { polygon, position, rotation } =
+    List.map
+        (Matrix.transform (Matrix.init 1 rotation position))
+        polygon
 
 
 angleBetween : Vector -> Vector -> Float
