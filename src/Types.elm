@@ -1,10 +1,11 @@
-module Types exposing (Radians, Polyline, Positioned, Moving, Expiring)
+module Types exposing (..)
 
 import Time exposing (Time)
 
 
 -- project
 
+import Geometry.Polygon exposing (Polygon)
 import Geometry.Vector exposing (Vector, Point)
 
 
@@ -14,6 +15,13 @@ type alias Radians =
 
 type alias Polyline =
     List Point
+
+
+type alias Boundaried a =
+    { a
+        | radius : Float
+        , polygon : Polygon
+    }
 
 
 type alias Positioned a =

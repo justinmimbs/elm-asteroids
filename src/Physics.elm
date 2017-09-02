@@ -80,7 +80,7 @@ meanPoint points =
                 |> (\( r, n ) -> Vector.scale (1 / n) r)
                 |> Just
 
-        _ ->
+        [] ->
             Nothing
 
 

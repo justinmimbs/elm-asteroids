@@ -7,11 +7,11 @@ import Random.Pcg as Random exposing (Generator)
 
 import Geometry.Polygon exposing (Polygon)
 import Geometry.Vector exposing (Point, distanceSquared)
-import Types exposing (Positioned, Moving)
+import Types exposing (Boundaried, Positioned, Moving)
 
 
 type alias Asteroid =
-    Positioned (Moving { radius : Float, polygon : Polygon })
+    Boundaried (Positioned (Moving {}))
 
 
 
