@@ -87,17 +87,23 @@ meanPoint points =
 collideAtPoint : Float -> Collidable a -> Collidable b -> Point -> Maybe ( Movement, Movement )
 collideAtPoint e a b contact =
     let
+        aContactVelocity =
+            a.velocity |> Vector.add (tangentialVelocity (Vector.sub contact a.position) a.angularVelocity)
+
+        bContactVelocity =
+            b.velocity |> Vector.add (tangentialVelocity (Vector.sub contact b.position) b.angularVelocity)
+
         aSpeed =
-            a.velocity |> Vector.length
+            aContactVelocity |> Vector.length
 
         bSpeed =
-            b.velocity |> Vector.length
+            bContactVelocity |> Vector.length
 
         aToward =
-            angleBetween a.velocity (Vector.sub contact a.position) < pi / 2
+            angleBetween aContactVelocity (Vector.sub b.position contact) < pi / 2
 
         bToward =
-            angleBetween b.velocity (Vector.sub contact b.position) < pi / 2
+            angleBetween bContactVelocity (Vector.sub a.position contact) < pi / 2
     in
         if aToward && bToward || aToward && aSpeed > bSpeed || bToward && bSpeed > aSpeed then
             let
@@ -114,10 +120,10 @@ collideAtPoint e a b contact =
                     b.velocity |> Vector.reflect (Vector.direction a.position b.position)
 
                 ( aPush, aSpin ) =
-                    a.position |> impulse b.velocity contact
+                    a.position |> impulse bContactVelocity contact
 
                 ( bPush, bSpin ) =
-                    b.position |> impulse a.velocity contact
+                    b.position |> impulse aContactVelocity contact
 
                 inelasticVel =
                     Vector.interpolate t b.velocity a.velocity
@@ -152,6 +158,15 @@ transformPolygon { polygon, position, rotation } =
     List.map
         (Matrix.transform (Matrix.init 1 rotation position))
         polygon
+
+
+tangentialVelocity : Vector -> Radians -> Vector
+tangentialVelocity radial angularVelocity =
+    let
+        ( radius, angle ) =
+            radial |> toPolar
+    in
+        ( radius * angularVelocity, angle + (pi / 2) ) |> fromPolar
 
 
 angleBetween : Vector -> Vector -> Float
