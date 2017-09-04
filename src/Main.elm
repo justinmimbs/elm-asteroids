@@ -73,8 +73,13 @@ type alias Spaceship =
 
 type Aux
     = Off
-    | Firing Time
-    | Shielding
+    | Firing Charge
+    | Shielding Charge
+
+
+type Charge
+    = Charged
+    | Charging Time
 
 
 type alias Blast =
@@ -238,25 +243,19 @@ update msg ({ controls } as model) =
 
 fireBlast : Time -> Player -> Maybe Blast
 fireBlast dt player =
-    case player.aux of
-        Firing timeTilFire ->
-            if timeTilFire < 0.001 then
-                let
-                    -- px / second
-                    speed =
-                        Vector.length player.velocity + 800
-                in
-                    { position = player.position
-                    , velocity = ( speed, player.rotation + pi / -2 ) |> fromPolar
-                    , timeRemaining = screenWidth / speed
-                    , deltaTime = dt
-                    }
-                        |> updateBlast dt
-            else
-                Nothing
-
-        _ ->
-            Nothing
+    if player.aux == Firing Charged then
+        let
+            speed =
+                Vector.length player.velocity + 800
+        in
+            { position = player.position
+            , velocity = ( speed, player.rotation + pi / -2 ) |> fromPolar
+            , timeRemaining = screenWidth / speed
+            , deltaTime = dt
+            }
+                |> updateBlast dt
+    else
+        Nothing
 
 
 updateBlast : Time -> Blast -> Maybe Blast
@@ -330,18 +329,33 @@ updateAux dt controls aux =
 
         ( False, True ) ->
             case aux of
-                Firing t ->
-                    if t < 0.001 then
-                        -- 6 hz
-                        Firing (1 / 6 - dt)
-                    else
-                        Firing (t - dt)
+                Firing charge ->
+                    -- 6 hz
+                    Firing (charge |> updateCharge dt (Just (1 / 6)))
 
                 _ ->
-                    Firing 0
+                    Firing Charged
 
         ( True, _ ) ->
-            Shielding
+            case aux of
+                Shielding charge ->
+                    Shielding (charge |> updateCharge dt Nothing)
+
+                _ ->
+                    Shielding Charged
+
+
+updateCharge : Time -> Maybe Time -> Charge -> Charge
+updateCharge dt cycleTime charge =
+    case charge of
+        Charging t ->
+            if t < 0.001 then
+                Charged
+            else
+                (Charging (t - dt))
+
+        Charged ->
+            cycleTime |> unwrap Charged ((+) -dt >> Charging)
 
 
 updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
@@ -476,8 +490,8 @@ interactBlastPlayer : Blast -> PlayerC -> Maybe ( Maybe PlayerC, Generator (List
 interactBlastPlayer =
     interactBlastCollidable
         (\impact player ->
-            if player.aux == Shielding then
-                ( player
+            if player.aux == Shielding Charged then
+                ( { player | aux = Shielding (Charging (impact.forceSpeed * 0.002)) }
                     |> addMovement
                         (Physics.impulse
                             (impact.blast.velocity |> Vector.normalize |> Vector.scale impact.forceSpeed)
@@ -538,7 +552,7 @@ interactAsteroidsPlayer asteroids player =
 
 interactAsteroidPlayer : Asteroid -> PlayerC -> Maybe ( Asteroid, Maybe PlayerC, Generator (List Particle) )
 interactAsteroidPlayer asteroid player =
-    if player.aux == Shielding then
+    if player.aux == Shielding Charged then
         Physics.collide 1 asteroid player
             |> Maybe.map
                 (\( aMovement, pMovement, contactPoint ) ->
@@ -550,7 +564,7 @@ interactAsteroidPlayer asteroid player =
                             player.radius ^ 2 / (player.radius ^ 2 + asteroid.radius ^ 2)
                     in
                         ( asteroid |> setMovement aMovement
-                        , player |> setMovement pMovement |> Just
+                        , { player | aux = Shielding (Charging (burstSpeed * 0.002)) } |> setMovement pMovement |> Just
                         , Particle.burst burstSpeed (burstSpeed * 0.2) (sqrt burstSpeed * 0.5 |> ceiling)
                             |> Random.map (List.map (adjustParticle contactPoint (Vector.interpolate t asteroid.velocity player.velocity)))
                         )
@@ -588,12 +602,10 @@ playerToPlayerC player =
     -- boundaried
     , radius = player.spaceship.radius
     , polygon =
-        case player.aux of
-            Shielding ->
-                player.spaceship.shield
-
-            _ ->
-                player.spaceship.hull
+        if player.aux == Shielding Charged then
+            player.spaceship.shield
+        else
+            player.spaceship.hull
     }
 
 
@@ -807,7 +819,7 @@ playerToPaths { position, rotation, spaceship, aux } =
         [ ( True, spaceship.hull |> transform )
         , ( False, spaceship.interior |> transform )
         ]
-            |> (if aux == Shielding then
+            |> (if aux == Shielding Charged then
                     (::) ( True, spaceship.shield |> transform )
                 else
                     identity
