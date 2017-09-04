@@ -541,16 +541,24 @@ interactAsteroidPlayer asteroid player =
     if player.aux == Shielding then
         Physics.collide 1 asteroid player
             |> Maybe.map
-                (\( aMovement, pMovement ) ->
-                    ( asteroid |> setMovement aMovement
-                    , player |> setMovement pMovement |> Just
-                    , Random.constant []
-                    )
+                (\( aMovement, pMovement, contactPoint ) ->
+                    let
+                        burstSpeed =
+                            Vector.length (Vector.add asteroid.velocity player.velocity) * 0.2 |> max 80
+
+                        t =
+                            player.radius ^ 2 / (player.radius ^ 2 + asteroid.radius ^ 2)
+                    in
+                        ( asteroid |> setMovement aMovement
+                        , player |> setMovement pMovement |> Just
+                        , Particle.burst burstSpeed (burstSpeed * 0.2) (sqrt burstSpeed * 0.5 |> ceiling)
+                            |> Random.map (List.map (adjustParticle contactPoint (Vector.interpolate t asteroid.velocity player.velocity)))
+                        )
                 )
     else
         Physics.collide 0.2 asteroid player
             |> Maybe.map
-                (\( aMovement, pMovement ) ->
+                (\( aMovement, pMovement, _ ) ->
                     ( asteroid |> setMovement aMovement
                     , Nothing
                     , player

@@ -125,7 +125,7 @@ updateDisks dt disks =
     case disks |> List.map (updateMoving dt >> wrapPosition) of
         [ a, b ] ->
             case Physics.collide 0.9 a b of
-                Just ( ma, mb ) ->
+                Just ( ma, mb, _ ) ->
                     [ a |> setMovement ma
                     , b |> setMovement mb
                     ]

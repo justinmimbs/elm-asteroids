@@ -55,7 +55,7 @@ type alias Collidable a =
     }
 
 
-collide : Float -> Collidable a -> Collidable b -> Maybe ( Movement, Movement )
+collide : Float -> Collidable a -> Collidable b -> Maybe ( Movement, Movement, Point )
 collide e a b =
     contactPoint a b |> Maybe.andThen (collideAtPoint e a b)
 
@@ -84,7 +84,7 @@ meanPoint points =
             Nothing
 
 
-collideAtPoint : Float -> Collidable a -> Collidable b -> Point -> Maybe ( Movement, Movement )
+collideAtPoint : Float -> Collidable a -> Collidable b -> Point -> Maybe ( Movement, Movement, Point )
 collideAtPoint e a b contact =
     let
         aContactVelocity =
@@ -148,6 +148,7 @@ collideAtPoint e a b contact =
                             |> interpolate (1 - t) bSpin
                             |> interpolate e inelasticAngVel
                       )
+                    , contact
                     )
         else
             Nothing
