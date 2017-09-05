@@ -23,7 +23,7 @@ main =
         , update = \x r -> ( update x r, Cmd.none )
         , view =
             List.head
-                >> Maybe.map (List.map (transformPolygon >> (,) True) >> viewPaths)
+                >> Maybe.map (List.map (transformPolygon >> (,,) 1 True) >> viewPaths)
                 >> Maybe.withDefault (Html.text "")
         , subscriptions =
             Sub.batch

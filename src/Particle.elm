@@ -32,7 +32,7 @@ burstRadial speed radius n =
             (pi * 2) / toFloat n
     in
         List.range 1 n
-            |> List.map (\i -> burstRadialParticle speed radius (toFloat (i % 3 + 1)) (toFloat i * sectionAngle))
+            |> List.map (\i -> burstRadialParticle speed radius (toFloat (i % 5) * 0.5 + 0.5) (toFloat i * sectionAngle))
 
 
 burstRadialParticle : Float -> Float -> Float -> Radians -> Particle

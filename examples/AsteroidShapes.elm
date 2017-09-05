@@ -25,9 +25,7 @@ main =
 
 asteroidToPath : Asteroid -> Screen.Path
 asteroidToPath { polygon, position, rotation } =
-    ( True
-    , polygon |> transformPoints position rotation
-    )
+    ( 1, True, polygon |> transformPoints position rotation )
 
 
 gridPositions : ( Int, Int ) -> ( Float, Float ) -> List ( Float, Float )

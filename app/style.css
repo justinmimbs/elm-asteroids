@@ -1,11 +1,15 @@
+html {
+    background-color: rgb(0, 0, 0);
+}
+
 svg {
-  background-color: rgb(245, 245, 245);
+  background-color: rgb(38, 46, 52);
 }
 
 polygon,
 polyline {
   fill: none;
-  stroke: rgb(80, 80, 80);
+  stroke: rgb(220, 245, 255);
   stroke-width: 2px;
   stroke-linecap: round;
   stroke-linejoin: round;

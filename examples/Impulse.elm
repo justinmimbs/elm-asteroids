@@ -128,9 +128,9 @@ view { drag, disk } =
                     (always [ mousemove, mouseup ])
                 |> Maybe.withDefault [ mousedown ]
 
-        paths : List ( Bool, List Point )
+        paths : List Screen.Path
         paths =
-            [ disk |> transformPolygon |> (,) True ]
+            [ disk |> transformPolygon |> (,,) 1 True ]
     in
         Svg.svg
             (attributes ++ events)
@@ -146,7 +146,7 @@ viewLine ( ( x1, y1 ), ( x2, y2 ) ) =
         , Svg.Attributes.y1 (y1 |> px)
         , Svg.Attributes.x2 (x2 |> px)
         , Svg.Attributes.y2 (y2 |> px)
-        , Svg.Attributes.style "stroke: rgba(0, 0, 0, 0.1)"
+        , Svg.Attributes.style "stroke: rgba(255, 255, 255, 0.2)"
         ]
         []
 

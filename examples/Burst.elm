@@ -140,10 +140,10 @@ view { drag, particles, polygon } =
                     (always [ mousemove, mouseup ])
                 |> Maybe.withDefault [ mousedown ]
 
-        paths : List ( Bool, List Point )
+        paths : List Screen.Path
         paths =
             List.concat
-                [ drag |> Maybe.map (\( _, p1 ) -> polygon |> List.map (Vector.add p1) |> (,) True) |> listFromMaybe
+                [ drag |> Maybe.map (\( _, p1 ) -> polygon |> List.map (Vector.add p1) |> (,,) 1 True) |> listFromMaybe
                 , particles |> List.map particleToPath
                 ]
     in
@@ -156,9 +156,7 @@ view { drag, particles, polygon } =
 
 particleToPath : Particle -> Screen.Path
 particleToPath { polyline, position, rotation } =
-    ( False
-    , polyline |> transformPoints position rotation
-    )
+    ( 1, False, polyline |> transformPoints position rotation )
 
 
 viewLine : ( Point, Point ) -> Svg a
@@ -168,7 +166,7 @@ viewLine ( ( x1, y1 ), ( x2, y2 ) ) =
         , Svg.Attributes.y1 (y1 |> px)
         , Svg.Attributes.x2 (x2 |> px)
         , Svg.Attributes.y2 (y2 |> px)
-        , Svg.Attributes.style "stroke: rgba(0, 0, 0, 0.1)"
+        , Svg.Attributes.style "stroke: rgba(255, 255, 255, 0.2)"
         ]
         []
 

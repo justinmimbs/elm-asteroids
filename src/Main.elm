@@ -652,7 +652,7 @@ interactBlastCollidable f blast obj =
                                 (blast.velocity |> Vector.length)
                                     * (blastMass / (blastMass + obj.radius ^ 2))
                             , particles =
-                                Particle.burst 100 80 (obj.radius / 4 |> ceiling)
+                                Particle.burst 100 50 (obj.radius / 4 |> ceiling)
                                     |> Random.map (List.map (adjustParticle point obj.velocity))
                             }
                             obj
@@ -778,13 +778,13 @@ floatModulo x y =
 view : Model -> Html a
 view { asteroids, player, blasts, particles } =
     [ asteroids
-        |> List.map (transformPolygon >> (,) True)
+        |> List.map (transformPolygon >> (,,) 0.5 True)
     , player
         |> unwrap [] playerToPaths
     , blasts
-        |> List.map (blastToLine >> (,) False)
+        |> List.map (blastToLine >> (,,) 1 False)
     , particles
-        |> List.map (transformParticle >> (,) False)
+        |> List.map particleToPath
     ]
         |> List.concat
         |> viewPaths
@@ -802,6 +802,30 @@ viewPaths paths =
         ]
 
 
+playerToPaths : Player -> List Screen.Path
+playerToPaths { position, rotation, spaceship, aux } =
+    let
+        transform =
+            transformPoints position rotation
+    in
+        [ ( 1, True, spaceship.hull |> transform )
+        , ( 1, False, spaceship.interior |> transform )
+        ]
+            |> (if aux == Shielding Charged then
+                    (::) ( 1, True, spaceship.shield |> transform )
+                else
+                    identity
+               )
+
+
+particleToPath : Particle -> Screen.Path
+particleToPath { polyline, position, rotation } =
+    ( abs (0.5 - floatModulo (rotation / pi) 1) + 0.5
+    , False
+    , polyline |> transformPoints position rotation
+    )
+
+
 transformPoints : Point -> Radians -> List Point -> List Point
 transformPoints position rotation =
     List.map
@@ -810,30 +834,9 @@ transformPoints position rotation =
         )
 
 
-playerToPaths : Player -> List Screen.Path
-playerToPaths { position, rotation, spaceship, aux } =
-    let
-        transform =
-            transformPoints position rotation
-    in
-        [ ( True, spaceship.hull |> transform )
-        , ( False, spaceship.interior |> transform )
-        ]
-            |> (if aux == Shielding Charged then
-                    (::) ( True, spaceship.shield |> transform )
-                else
-                    identity
-               )
-
-
 transformPolygon : Positioned { a | polygon : Polygon } -> Polygon
 transformPolygon { polygon, position, rotation } =
     polygon |> transformPoints position rotation
-
-
-transformParticle : Particle -> Polyline
-transformParticle { polyline, position, rotation } =
-    polyline |> transformPoints position rotation
 
 
 blastTrailPosition : Blast -> Point

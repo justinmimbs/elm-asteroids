@@ -50,6 +50,4 @@ initField =
 
 asteroidToPath : Asteroid -> Screen.Path
 asteroidToPath { polygon, position, rotation } =
-    ( True
-    , polygon |> transformPoints position rotation
-    )
+    ( 1, True, polygon |> transformPoints position rotation )

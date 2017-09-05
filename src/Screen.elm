@@ -11,7 +11,7 @@ import Geometry.Vector exposing (Point)
 
 
 type alias Path =
-    ( Bool, List Point )
+    ( Float, Bool, List Point )
 
 
 screenId : String
@@ -41,8 +41,8 @@ render ( width, height ) paths =
         ]
 
 
-viewPath : ( Bool, List Point ) -> Svg a
-viewPath ( closed, points ) =
+viewPath : ( Float, Bool, List Point ) -> Svg a
+viewPath ( opacity, closed, points ) =
     Svg.node
         (if closed then
             "polygon"
@@ -50,6 +50,7 @@ viewPath ( closed, points ) =
             "polyline"
         )
         [ Svg.Attributes.points (points |> pointsToString)
+        , Svg.Attributes.opacity (opacity |> toString)
         ]
         []
 
