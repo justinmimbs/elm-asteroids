@@ -43,7 +43,7 @@ setPosition x a =
 
 asteroid : Generator Asteroid
 asteroid =
-    Random.float 30 60
+    Random.float 25 55
         |> Random.andThen
             (\radius ->
                 Random.map3

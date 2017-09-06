@@ -440,7 +440,7 @@ interactBlastAsteroid =
                             ( fragmentVelocity, fragmentAngularVelocity ) =
                                 Physics.impulse forceVelocity impact.point fragmentPosition
                         in
-                            if fragmentRadius < 20 then
+                            if fragmentRadius < 18 then
                                 ( fragments
                                 , fragmentPolygon
                                     |> Particle.explode impact.forceSpeed impact.forceSpeed
@@ -452,7 +452,11 @@ interactBlastAsteroid =
                                   , radius = fragmentRadius
                                   , position = fragmentPosition
                                   , rotation = 0
-                                  , velocity = asteroid.velocity |> Vector.add fragmentVelocity
+                                  , velocity =
+                                        Vector.interpolate (fragmentRadius ^ 2 / asteroid.radius ^ 2)
+                                            (Vector.direction asteroid.position fragmentPosition |> Vector.scale impact.forceSpeed)
+                                            asteroid.velocity
+                                            |> Vector.add fragmentVelocity
                                   , angularVelocity = asteroid.angularVelocity + fragmentAngularVelocity
                                   }
                                     :: fragments
@@ -725,6 +729,7 @@ spaceship0 =
         , ( 18, 9 )
         , ( 10, 19 )
         ]
+            |> List.map (Vector.scale (18 / 22))
     , interior =
         [ ( -10, 19 )
         , ( -6, 3 )
@@ -732,10 +737,11 @@ spaceship0 =
         , ( 6, 3 )
         , ( 10, 19 )
         ]
+            |> List.map (Vector.scale (18 / 22))
     , shield =
-        Polygon.ngon 16 |> List.map (Vector.scale 23)
+        Polygon.ngon 16 |> List.map (Vector.scale 19)
     , radius =
-        22
+        18
     }
 
 
