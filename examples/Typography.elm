@@ -26,7 +26,7 @@ astraeaPolylines =
 main : Html a
 main =
     Svg.svg
-        [ Svg.Attributes.width "1000px"
+        [ Svg.Attributes.width "1400px"
         , Svg.Attributes.height "1000px"
         , Svg.Attributes.fill "none"
         , Svg.Attributes.stroke "gray"
@@ -40,10 +40,15 @@ main =
             , Svg.Attributes.strokeLinejoin "miter"
             , Svg.Attributes.strokeMiterlimit "4"
             ]
-            ("1234 5678" |> Font.typesetLine ((flip (,)) 50 >> viewPath) Astraea.pathData 50)
+            ("0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                |> Font.typesetLine ((flip (,)) 50 >> viewPath) Astraea.pathData 50
+            )
         , Svg.g
             []
-            ("1234 5678" |> Font.typesetLine (\x p -> p |> List.map (viewPolyline ( x, 150 ))) astraeaPolylines 50 |> List.concat)
+            ("0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                |> Font.typesetLine (\x p -> p |> List.map (viewPolyline ( x, 150 ))) astraeaPolylines 50
+                |> List.concat
+            )
         ]
 
 
