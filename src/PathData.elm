@@ -1,4 +1,4 @@
-module PathData exposing (PathData, Command(..), toString, toPolylines)
+module PathData exposing (PathData, Command(..), toString, toPolylines, scale)
 
 import Geometry.Vector as Vector exposing (Point)
 
@@ -78,6 +78,24 @@ toPolylines segmentLength =
                     result
         )
         []
+
+
+scaleCommand : Float -> Command -> Command
+scaleCommand s command =
+    case command of
+        M x y ->
+            M (x * s) (y * s)
+
+        L x y ->
+            L (x * s) (y * s)
+
+        C a b c d x y ->
+            C (a * s) (b * s) (c * s) (d * s) (x * s) (y * s)
+
+
+scale : Float -> PathData -> PathData
+scale =
+    scaleCommand >> List.map
 
 
 

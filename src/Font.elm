@@ -1,4 +1,4 @@
-module Font exposing (Font, map, typesetLine)
+module Font exposing (Font, map, scale, typesetLine)
 
 import Dict exposing (Dict)
 
@@ -17,6 +17,15 @@ map f font =
         | replacement = f font.replacement
         , characters = font.characters |> Dict.map (always f)
     }
+
+
+scale : (Float -> a -> a) -> Float -> Font a -> Font a
+scale f s font =
+    { font
+        | width = font.width * s
+        , height = font.height * s
+    }
+        |> map (f s)
 
 
 typesetLine : (Float -> a -> b) -> Font a -> Float -> String -> List b

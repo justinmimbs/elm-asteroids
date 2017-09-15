@@ -11,7 +11,7 @@ import PathData exposing (PathData, Command(M, L, C))
 
 pathData : Font PathData
 pathData =
-    { width = 36
+    { width = 32
     , height = 48
     , replacement = [ M 16 10, L 30 24, L 16 38, L 2 24, L 16 10 ]
     , characters =
