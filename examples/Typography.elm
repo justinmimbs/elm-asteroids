@@ -20,7 +20,7 @@ type alias Circle =
 
 astraeaPolylines : Font (List (List Point))
 astraeaPolylines =
-    Astraea.pathData |> Font.map (PathData.toPolylines 3)
+    Astraea.pathData |> Font.map (PathData.toPolylines 13)
 
 
 main : Html a

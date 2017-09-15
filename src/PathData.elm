@@ -33,16 +33,23 @@ commandToString command =
         |> String.join " "
 
 
-bezierToPolyline : Int -> List Point -> List Point
-bezierToPolyline n controls =
-    List.range 0 n
-        |> List.map
-            (\i -> pointOnBezier (toFloat i / toFloat n) controls)
+bezierToPolyline : Float -> List Point -> List Point
+bezierToPolyline segmentLength controlPoints =
+    let
+        hullLength =
+            controlPoints |> foldPairs (Vector.distance >>> (+)) 0
+
+        n =
+            hullLength / segmentLength |> ceiling
+    in
+        List.range 0 n
+            |> List.map
+                (\i -> pointOnBezier (toFloat i / toFloat n) controlPoints)
 
 
 pointOnBezier : Float -> List Point -> Point
-pointOnBezier t controls =
-    case controls of
+pointOnBezier t controlPoints =
+    case controlPoints of
         [] ->
             Vector.zero
 
@@ -50,11 +57,11 @@ pointOnBezier t controls =
             p
 
         _ ->
-            pointOnBezier t (mapPairs (Vector.interpolate t) controls)
+            pointOnBezier t (mapPairs (Vector.interpolate t) controlPoints)
 
 
-toPolylines : Int -> PathData -> List (List Point)
-toPolylines n =
+toPolylines : Float -> PathData -> List (List Point)
+toPolylines segmentLength =
     List.foldl
         (\command result ->
             case ( command, result ) of
@@ -65,7 +72,7 @@ toPolylines n =
                     (( x, y ) :: polyline) :: rest
 
                 ( C a b c d x y, (p :: polyline) :: rest ) ->
-                    (bezierToPolyline n [ ( x, y ), ( c, d ), ( a, b ), p ] ++ polyline) :: rest
+                    (bezierToPolyline segmentLength [ ( x, y ), ( c, d ), ( a, b ), p ] ++ polyline) :: rest
 
                 _ ->
                     result
@@ -93,3 +100,12 @@ will be one less than the given list.
 mapPairs : (a -> a -> b) -> List a -> List b
 mapPairs f =
     foldPairs (\x y -> f x y |> (::)) [] >> List.reverse
+
+
+
+--
+
+
+(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
+(>>>) f g x y =
+    g (f x y)
