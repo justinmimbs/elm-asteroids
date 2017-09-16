@@ -10,14 +10,21 @@ import Time exposing (Time)
 
 -- project modules
 
+import Asteroid exposing (Asteroid)
+import Font exposing (Font)
+import Font.Astraea as Astraea
+import Geometry.Vector as Vector exposing (Point)
 import Level exposing (Controls, Level)
+import PathData exposing (PathData)
 import Screen
+import Types exposing (Moving, Positioned, Polyline)
+import Util exposing (transformPoints, wrapPosition)
 
 
 main : Program Never Model Msg
 main =
     Html.program
-        { init = ( init (Random.initialSeed 3780540833), Cmd.none )
+        { init = ( Random.initialSeed 3780540833 |> init, Cmd.none )
         , update = \msg model -> ( update msg model, Cmd.none )
         , view = view
         , subscriptions =
@@ -33,22 +40,37 @@ main =
 
 init : Random.Seed -> Model
 init seed =
-    { seed = seed
-    , controls = Level.initialControls
-    , level = Level.init screenSize seed
-    }
+    ( seed, initMainTitle seed )
 
 
 type alias Model =
-    { seed : Random.Seed
-    , controls : Controls
-    , level : Level
-    }
+    ( Random.Seed, State )
+
+
+type State
+    = MainTitle (List Asteroid)
+    | Playing Int Level Controls
 
 
 screenSize : ( Float, Float )
 screenSize =
     ( 1200, 900 )
+
+
+initMainTitle : Random.Seed -> State
+initMainTitle =
+    Random.step (Asteroid.field screenSize 0 10)
+        >> Tuple.first
+        >> MainTitle
+
+
+initLevel : Int -> Random.Seed -> State
+initLevel n seed =
+    let
+        levelSeed =
+            seed |> Random.fastForward n |> Random.step Random.independentSeed |> Tuple.first
+    in
+        Playing n (Level.init screenSize levelSeed) Level.initialControls
 
 
 
@@ -58,6 +80,7 @@ screenSize =
 type Msg
     = NoOp
     | Input Control Bool
+    | Start
     | Tick Time
 
 
@@ -70,63 +93,97 @@ type Control
 
 
 keyCodeToMsg : Bool -> Int -> Msg
-keyCodeToMsg state keyCode =
+keyCodeToMsg isPressed keyCode =
     case keyCode of
+        -- enter
+        13 ->
+            if isPressed then
+                Start
+            else
+                NoOp
+
         -- left
         37 ->
-            Input Left state
+            Input Left isPressed
 
         -- up
         38 ->
-            Input Thrust state
+            Input Thrust isPressed
 
         -- right
         39 ->
-            Input Right state
+            Input Right isPressed
 
         -- f
         70 ->
-            Input Fire state
+            Input Fire isPressed
 
         -- s
         83 ->
-            Input Shield state
+            Input Shield isPressed
 
         _ ->
             NoOp
 
 
 update : Msg -> Model -> Model
-update msg ({ controls } as model) =
-    case msg of
+update msg (( seed, state ) as model) =
+    (case msg of
         NoOp ->
-            model
+            state
 
-        Input control state ->
-            { model
-                | controls =
-                    (case control of
-                        Left ->
-                            { controls | left = state }
+        Start ->
+            case state of
+                MainTitle _ ->
+                    initLevel 1 seed
 
-                        Right ->
-                            { controls | right = state }
+                _ ->
+                    state
 
-                        Thrust ->
-                            { controls | thrust = state }
+        Input control isPressed ->
+            case state of
+                Playing n level controls ->
+                    Playing n level (controls |> updateControls control isPressed)
 
-                        Fire ->
-                            { controls | fire = state }
-
-                        Shield ->
-                            { controls | shield = state }
-                    )
-            }
+                _ ->
+                    state
 
         Tick dt ->
-            { model
-                | level = model.level |> Level.update dt controls
-            }
+            case state of
+                MainTitle asteroids ->
+                    MainTitle (asteroids |> List.map (updateMoving dt >> wrapPosition screenSize))
+
+                Playing n level controls ->
+                    Playing n (level |> Level.update dt controls) controls
+    )
+        |> (,) seed
+
+
+updateControls : Control -> Bool -> Controls -> Controls
+updateControls control isPressed controls =
+    case control of
+        Left ->
+            { controls | left = isPressed }
+
+        Right ->
+            { controls | right = isPressed }
+
+        Thrust ->
+            { controls | thrust = isPressed }
+
+        Fire ->
+            { controls | fire = isPressed }
+
+        Shield ->
+            { controls | shield = isPressed }
+
+
+updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
+updateMoving dt obj =
+    { obj
+        | position = obj.position |> Vector.add (obj.velocity |> Vector.scale dt)
+        , rotation = obj.rotation + obj.angularVelocity * dt
+    }
 
 
 
@@ -134,8 +191,25 @@ update msg ({ controls } as model) =
 
 
 view : Model -> Html a
-view =
-    .level >> Level.toPaths >> viewPaths
+view ( _, state ) =
+    case state of
+        MainTitle asteroids ->
+            let
+                center =
+                    screenSize |> Vector.scale 0.5
+            in
+                typesetForScreen titleFont center "ASTEROIDS"
+                    ++ typesetForScreen bodyFont (center |> Vector.add ( 0, 3 * bodyFont.height )) "PRESS ENTER"
+                    ++ (asteroids |> List.map asteroidToPath)
+                    |> viewPaths
+
+        Playing _ level _ ->
+            level |> Level.toPaths |> viewPaths
+
+
+asteroidToPath : Asteroid -> Screen.Path
+asteroidToPath { polygon, position, rotation } =
+    ( 0.5, True, polygon |> transformPoints position rotation )
 
 
 viewPaths : List Screen.Path -> Html a
@@ -148,3 +222,33 @@ viewPaths paths =
         ]
         [ paths |> Screen.render screenSize
         ]
+
+
+
+-- typography
+
+
+titleFont : Font (List Polyline)
+titleFont =
+    Astraea.pathData
+        |> Font.scale PathData.scale 3
+        |> Font.map (PathData.toPolylines 26)
+
+
+bodyFont : Font (List Polyline)
+bodyFont =
+    Astraea.pathData
+        |> Font.map (PathData.toPolylines 13)
+        |> (\a -> { a | width = a.width + 2 })
+
+
+typesetForScreen : Font (List Polyline) -> Point -> String -> List Screen.Path
+typesetForScreen font ( cx, cy ) text =
+    let
+        ( ox, oy ) =
+            ( cx - ((toFloat (String.length text) * font.width) / 2)
+            , cy - font.height
+            )
+    in
+        Font.typesetLine (\x -> List.map (List.map (Vector.add ( x, oy )))) font ox text
+            |> List.concatMap (List.map ((,,) 1 False))

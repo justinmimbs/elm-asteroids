@@ -9,13 +9,13 @@ import Time exposing (Time)
 import Asteroid exposing (Asteroid)
 import Geometry.Circle as Circle
 import Geometry.Line as Line exposing (Intersection(SegmentSegment))
-import Geometry.Matrix as Matrix
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
 import Particle exposing (Particle)
 import Physics exposing (Movement, Collidable)
 import Screen
 import Types exposing (Radians, Polyline, Boundaried, Positioned, Moving, Expiring)
+import Util exposing (transformPoints, wrapPosition, floatModulo)
 
 
 type alias Controls =
@@ -660,33 +660,6 @@ addMovement ( v, av ) a =
 
 
 
--- wrapping
-
-
-wrapPosition : ( Float, Float ) -> { a | position : Point } -> { a | position : Point }
-wrapPosition screenSize object =
-    { object
-        | position = object.position |> wrapPoint screenSize
-    }
-
-
-wrapPoint : ( Float, Float ) -> Point -> Point
-wrapPoint ( width, height ) ( x, y ) =
-    ( floatModulo x width
-    , floatModulo y height
-    )
-
-
-floatModulo : Float -> Float -> Float
-floatModulo x y =
-    let
-        n =
-            x / y |> floor |> toFloat
-    in
-        x - n * y
-
-
-
 -- view
 
 
@@ -726,14 +699,6 @@ particleToPath { polyline, position, rotation } =
     , False
     , polyline |> transformPoints position rotation
     )
-
-
-transformPoints : Point -> Radians -> List Point -> List Point
-transformPoints position rotation =
-    List.map
-        (Matrix.transform
-            (Matrix.init 1 rotation position)
-        )
 
 
 transformPolygon : Positioned { a | polygon : Polygon } -> Polygon
