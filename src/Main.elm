@@ -24,7 +24,7 @@ import Util exposing (transformPoints, wrapPosition)
 main : Program Never Model Msg
 main =
     Html.program
-        { init = ( Random.initialSeed 3780540833 |> init, Cmd.none )
+        { init = ( Random.initialSeed 3780540839 |> init, Cmd.none )
         , update = \msg model -> ( update msg model, Cmd.none )
         , view = view
         , subscriptions =
@@ -49,6 +49,7 @@ type alias Model =
 
 type State
     = MainTitle (List Asteroid)
+    | LevelTitle Int Level Time
     | Playing Int Level Controls
 
 
@@ -64,13 +65,12 @@ initMainTitle =
         >> MainTitle
 
 
-initLevel : Int -> Random.Seed -> State
-initLevel n seed =
-    let
-        levelSeed =
-            seed |> Random.fastForward n |> Random.step Random.independentSeed |> Tuple.first
-    in
-        Playing n (Level.init screenSize levelSeed) Level.initialControls
+initLevel : Int -> Random.Seed -> Level
+initLevel n =
+    Random.fastForward (n + 1)
+        >> Random.step Random.independentSeed
+        >> Tuple.first
+        >> Level.init screenSize
 
 
 
@@ -135,7 +135,7 @@ update msg (( seed, state ) as model) =
         Start ->
             case state of
                 MainTitle _ ->
-                    initLevel 1 seed
+                    LevelTitle 1 (initLevel 1 seed) 0
 
                 _ ->
                     state
@@ -152,6 +152,12 @@ update msg (( seed, state ) as model) =
             case state of
                 MainTitle asteroids ->
                     MainTitle (asteroids |> List.map (updateMoving dt >> wrapPosition screenSize))
+
+                LevelTitle n level elapsed ->
+                    if elapsed < 1 then
+                        LevelTitle n (level |> Level.update dt Level.initialControls) (elapsed + dt)
+                    else
+                        Playing n level Level.initialControls
 
                 Playing n level controls ->
                     Playing n (level |> Level.update dt controls) controls
@@ -202,6 +208,11 @@ view ( _, state ) =
                     ++ typesetForScreen bodyFont (center |> Vector.add ( 0, 3 * bodyFont.height )) "PRESS ENTER"
                     ++ (asteroids |> List.map asteroidToPath)
                     |> viewPaths
+
+        LevelTitle n level _ ->
+            typesetForScreen bodyFont (screenSize |> Vector.scale 0.5 |> Vector.add ( 0, 0.5 * bodyFont.height )) ("LEVEL " ++ toString n)
+                ++ ({ level | player = Nothing } |> Level.toPaths)
+                |> viewPaths
 
         Playing _ level _ ->
             level |> Level.toPaths |> viewPaths

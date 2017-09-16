@@ -91,7 +91,7 @@ init : ( Float, Float ) -> Random.Seed -> Level
 init screenSize seed =
     let
         ( asteroids, seedNext ) =
-            seed |> Random.step (Asteroid.field screenSize (Tuple.first screenSize / 6) 10)
+            seed |> Random.step (Asteroid.field screenSize 300 7)
     in
         { screenSize = screenSize
         , seed = seedNext
@@ -257,13 +257,16 @@ updatePlayer dt controls player =
                 |> Vector.add (player.velocity |> Vector.scale (positionFriction * dt))
                 |> Vector.add (positionThrust)
     in
-        { player
-            | position = positionNext
-            , rotation = rotationNext
-            , velocity = Vector.sub positionNext player.position |> Vector.scale (1 / dt)
-            , angularVelocity = (rotationNext - player.rotation) / dt
-            , aux = player.aux |> updateAux dt controls
-        }
+        if dt == 0 then
+            player
+        else
+            { player
+                | position = positionNext
+                , rotation = rotationNext
+                , velocity = Vector.sub positionNext player.position |> Vector.scale (1 / dt)
+                , angularVelocity = (rotationNext - player.rotation) / dt
+                , aux = player.aux |> updateAux dt controls
+            }
 
 
 updateAux : Time -> Controls -> Aux -> Aux
