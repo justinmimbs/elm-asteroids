@@ -1,4 +1,4 @@
-module Level exposing (Controls, initialControls, Level, init, update, toPaths)
+module Level exposing (Controls, initialControls, Level, Ending(..), init, update, toPaths)
 
 import Random.Pcg as Random exposing (Generator)
 import Time exposing (Time)
@@ -87,11 +87,19 @@ type alias Blast =
         }
 
 
-init : ( Float, Float ) -> Random.Seed -> Level
-init screenSize seed =
+type Ending
+    = Cleared
+    | Destroyed
+
+
+init : ( Float, Float ) -> Int -> Random.Seed -> Level
+init screenSize n seed =
     let
+        count =
+            3 + 2 * n |> min 27
+
         ( asteroids, seedNext ) =
-            seed |> Random.step (Asteroid.field screenSize 300 7)
+            seed |> Random.step (Asteroid.field screenSize 300 count)
     in
         { screenSize = screenSize
         , seed = seedNext
@@ -141,7 +149,7 @@ spaceship0 =
 -- update
 
 
-update : Time -> Controls -> Level -> Level
+update : Time -> Controls -> Level -> ( Level, Maybe Ending )
 update dt controls model =
     let
         wrapPosition_ =
@@ -177,13 +185,20 @@ update dt controls model =
                 |> List.foldl (appendMaybe (Random.map2 (++))) Nothing
                 |> unwrap ( [], model.seed ) ((flip Random.step) model.seed)
     in
-        { model
+        ( { model
             | asteroids = asteroidsI2
             , player = Maybe.map playerFromPlayerC playerC2
             , blasts = blastsI2
             , particles = newParticles ++ particlesU
             , seed = seedNext
-        }
+          }
+        , if isJust model.player && not (isJust playerC2) then
+            Just Destroyed
+          else if not (List.isEmpty model.asteroids) && List.isEmpty asteroidsI2 then
+            Just Cleared
+          else
+            Nothing
+        )
 
 
 fireBlast : Time -> Player -> Maybe Blast
@@ -725,6 +740,11 @@ blastToLine blast =
 -- helpers
 
 
+(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
+(>>>) f g x y =
+    g (f x y)
+
+
 either : a -> a -> Bool -> a
 either t f x =
     if x then
@@ -743,9 +763,14 @@ unwrap default f m =
             default
 
 
-(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
-(>>>) f g x y =
-    g (f x y)
+isJust : Maybe a -> Bool
+isJust a =
+    case a of
+        Just _ ->
+            True
+
+        Nothing ->
+            False
 
 
 appendMaybe : (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
