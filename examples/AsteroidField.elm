@@ -9,9 +9,8 @@ import Time exposing (Time)
 -- project modules
 
 import Asteroid exposing (Asteroid)
-import Geometry.Force as Force
 import Geometry.Vector as Vector
-import Main exposing (viewPaths, transformPoints, wrapPosition)
+import Util exposing (transformPoints, wrapPosition)
 import Screen
 import Types exposing (Moving, Positioned)
 
@@ -21,7 +20,7 @@ main =
     Html.program
         { init = ( initField, Cmd.none )
         , update = \x r -> ( update x r, Cmd.none )
-        , view = List.map asteroidToPath >> viewPaths
+        , view = List.map asteroidToPath >> Screen.render screenSize
         , subscriptions = always (AnimationFrame.diffs Time.inSeconds)
         }
 
@@ -29,7 +28,7 @@ main =
 update : Time -> List Asteroid -> List Asteroid
 update dt =
     List.map
-        (updateMoving dt >> wrapPosition)
+        (updateMoving dt >> wrapPosition screenSize)
 
 
 updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
@@ -45,7 +44,11 @@ initField =
     Random.initialSeed 3780540833
         |> Random.step (Asteroid.field ( 1200, 900 ) 200 10)
         |> Tuple.first
-        |> Force.separate
+
+
+screenSize : ( Float, Float )
+screenSize =
+    ( 1200, 900 )
 
 
 asteroidToPath : Asteroid -> Screen.Path

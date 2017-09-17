@@ -8,8 +8,8 @@ import Random.Pcg as Random
 
 import Asteroid exposing (Asteroid)
 import Geometry.Vector as Vector
-import Main exposing (viewPaths, transformPoints)
 import Screen
+import Util exposing (transformPoints)
 
 
 main : Html a
@@ -20,7 +20,7 @@ main =
         |> List.map2
             (\pos object -> { object | position = pos } |> asteroidToPath)
             (gridPositions ( 7, 5 ) ( 150, 150 ) |> List.map (Vector.add ( 150, 150 )))
-        |> viewPaths
+        |> Screen.render ( 1200, 900 )
 
 
 asteroidToPath : Asteroid -> Screen.Path

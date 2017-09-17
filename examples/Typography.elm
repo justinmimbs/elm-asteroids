@@ -11,7 +11,7 @@ import Svg.Attributes
 import Font exposing (Font)
 import Font.Astraea as Astraea
 import Geometry.Vector as Vector exposing (Point)
-import PathData exposing (PathData, Command(M, L, C))
+import PathData exposing (PathData)
 
 
 type alias Circle =

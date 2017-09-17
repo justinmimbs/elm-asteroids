@@ -13,10 +13,10 @@ import Time exposing (Time)
 
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
-import Main exposing (transformPoints, wrapPosition, updateMoving, updateExpiring)
 import Physics exposing (Movement)
 import Screen
 import Types exposing (Moving, Positioned, Radians)
+import Util exposing (transformPoints, wrapPosition)
 
 
 type alias Model =
@@ -92,7 +92,15 @@ update msg ({ drag, disk } as model) =
                     model
 
         Tick dt ->
-            { model | disk = model.disk |> updateMoving dt |> wrapPosition }
+            { model | disk = model.disk |> updateMoving dt |> wrapPosition screenSize }
+
+
+updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
+updateMoving dt obj =
+    { obj
+        | position = obj.position |> Vector.add (obj.velocity |> Vector.scale dt)
+        , rotation = obj.rotation + obj.angularVelocity * dt
+    }
 
 
 addMovement : Movement -> Moving a -> Moving a
@@ -135,7 +143,7 @@ view { drag, disk } =
         Svg.svg
             (attributes ++ events)
             [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
-            , Screen.render screenSize paths
+            , paths |> Screen.render screenSize
             ]
 
 

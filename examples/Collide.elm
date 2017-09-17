@@ -10,10 +10,10 @@ import Time exposing (Time)
 
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
-import Main exposing (viewPaths, transformPoints, wrapPosition, updateMoving)
 import Physics exposing (Movement, Collidable)
 import Screen
 import Types exposing (Moving, Positioned, Radians)
+import Util exposing (transformPoints, wrapPosition)
 
 
 main : Program Never (List (List Disk)) Msg
@@ -23,7 +23,7 @@ main =
         , update = \x r -> ( update x r, Cmd.none )
         , view =
             List.head
-                >> Maybe.map (List.map (transformPolygon >> (,,) 1 True) >> viewPaths)
+                >> Maybe.map (List.map (transformPolygon >> (,,) 1 True) >> Screen.render screenSize)
                 >> Maybe.withDefault (Html.text "")
         , subscriptions =
             Sub.batch
@@ -122,7 +122,7 @@ update msg lists =
 
 updateDisks : Time -> List Disk -> List Disk
 updateDisks dt disks =
-    case disks |> List.map (updateMoving dt >> wrapPosition) of
+    case disks |> List.map (updateMoving dt >> wrapPosition screenSize) of
         [ a, b ] ->
             case Physics.collide 0.9 a b of
                 Just ( ma, mb, _ ) ->
@@ -135,6 +135,19 @@ updateDisks dt disks =
 
         x ->
             x
+
+
+updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
+updateMoving dt obj =
+    { obj
+        | position = obj.position |> Vector.add (obj.velocity |> Vector.scale dt)
+        , rotation = obj.rotation + obj.angularVelocity * dt
+    }
+
+
+screenSize : ( Float, Float )
+screenSize =
+    ( 1200, 900 )
 
 
 setMovement : Movement -> Moving a -> Moving a

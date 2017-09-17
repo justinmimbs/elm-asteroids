@@ -14,9 +14,10 @@ import Time exposing (Time)
 
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector exposing (Vector, Point)
-import Main exposing (transformPoints, wrapPosition, updateMoving, updateExpiring)
+import Util exposing (transformPoints, wrapPosition)
 import Particle exposing (Particle)
 import Screen
+import Types exposing (Moving, Expiring, Positioned)
 
 
 type alias Model =
@@ -109,7 +110,24 @@ adjustParticle position velocity particle =
 
 updateParticle : Time -> Particle -> Maybe Particle
 updateParticle dt =
-    updateMoving dt >> wrapPosition >> updateExpiring dt
+    updateMoving dt >> wrapPosition screenSize >> updateExpiring dt
+
+
+updateMoving : Time -> Moving (Positioned a) -> Moving (Positioned a)
+updateMoving dt obj =
+    { obj
+        | position = obj.position |> Vector.add (obj.velocity |> Vector.scale dt)
+        , rotation = obj.rotation + obj.angularVelocity * dt
+    }
+
+
+updateExpiring : Time -> Expiring a -> Maybe (Expiring a)
+updateExpiring dt obj =
+    if obj.timeRemaining > 0 then
+        Just
+            { obj | timeRemaining = obj.timeRemaining - dt }
+    else
+        Nothing
 
 
 
@@ -150,7 +168,7 @@ view { drag, particles, polygon } =
         Svg.svg
             (attributes ++ events)
             [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
-            , Screen.render screenSize paths
+            , paths |> Screen.render screenSize
             ]
 
 
