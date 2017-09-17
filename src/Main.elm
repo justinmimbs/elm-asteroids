@@ -69,7 +69,7 @@ initMainTitle =
 
 initLevel : Int -> Random.Seed -> State
 initLevel n seed =
-    LevelTitle n (Level.init screenSize n (levelSeed n seed)) 1.0
+    LevelTitle n (Level.init screenSize n (levelSeed n seed) |> Level.asteroidsUpdate -1.5) 1.5
 
 
 levelSeed : Int -> Random.Seed -> Random.Seed
@@ -167,7 +167,7 @@ update msg (( seed, state ) as model) =
 
                 LevelTitle n level timer ->
                     if timer > dt then
-                        LevelTitle n (level |> Level.update dt Level.initialControls |> Tuple.first) (timer - dt)
+                        LevelTitle n (level |> Level.asteroidsUpdate dt) (timer - dt)
                     else
                         Playing n level Level.initialControls
 
@@ -177,7 +177,7 @@ update msg (( seed, state ) as model) =
                             Playing n levelUpdated controls
 
                         ( levelUpdated, Just Level.Cleared ) ->
-                            Cleared n levelUpdated controls 4.0
+                            Cleared n levelUpdated controls 3.0
 
                         ( levelUpdated, Just Level.Destroyed ) ->
                             Destroyed n levelUpdated 7.0
@@ -239,14 +239,14 @@ view ( _, state ) =
 
         LevelTitle n level _ ->
             ("LEVEL " ++ toString n |> typeset mediumFont (screenCenter |> Vector.add ( 0, 0.5 * mediumFont.height )))
-                ++ ({ level | player = Nothing } |> Level.toPaths)
+                ++ (level |> Level.asteroidsToPaths)
                 |> viewPaths
 
         Playing _ level _ ->
             level |> Level.toPaths |> viewPaths
 
         Cleared _ level _ timer ->
-            if timer > 3 then
+            if timer > 2 then
                 level |> Level.toPaths |> viewPaths
             else
                 ("CLEARED" |> typeset mediumFont (screenCenter |> Vector.add ( 0, 0.5 * mediumFont.height )))

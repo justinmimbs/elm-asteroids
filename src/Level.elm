@@ -1,4 +1,4 @@
-module Level exposing (Controls, initialControls, Level, Ending(..), init, update, toPaths)
+module Level exposing (Controls, initialControls, Level, Ending(..), init, update, toPaths, asteroidsUpdate, asteroidsToPaths)
 
 import Random.Pcg as Random exposing (Generator)
 import Time exposing (Time)
@@ -99,7 +99,7 @@ init screenSize n seed =
             3 + 2 * n |> min 27
 
         ( asteroids, seedNext ) =
-            seed |> Random.step (Asteroid.field screenSize 300 count)
+            seed |> Random.step (Asteroid.field screenSize 250 count)
     in
         { screenSize = screenSize
         , seed = seedNext
@@ -199,6 +199,14 @@ update dt controls model =
           else
             Nothing
         )
+
+
+asteroidsUpdate : Time -> Level -> Level
+asteroidsUpdate dt level =
+    { level
+        | asteroids =
+            level.asteroids |> List.map (updateMoving dt >> wrapPosition level.screenSize)
+    }
 
 
 fireBlast : Time -> Player -> Maybe Blast
@@ -684,7 +692,7 @@ addMovement ( v, av ) a =
 toPaths : Level -> List Screen.Path
 toPaths { asteroids, player, blasts, particles } =
     [ asteroids
-        |> List.map (transformPolygon >> (,,) 0.5 True)
+        |> List.map asteroidToPath
     , player
         |> unwrap [] playerToPaths
     , blasts
@@ -693,6 +701,16 @@ toPaths { asteroids, player, blasts, particles } =
         |> List.map particleToPath
     ]
         |> List.concat
+
+
+asteroidsToPaths : Level -> List Screen.Path
+asteroidsToPaths =
+    .asteroids >> List.map asteroidToPath
+
+
+asteroidToPath : Asteroid -> Screen.Path
+asteroidToPath =
+    transformPolygon >> (,,) 0.5 True
 
 
 playerToPaths : Player -> List Screen.Path
