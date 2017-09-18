@@ -22,7 +22,8 @@ screenId =
 render : ( Float, Float ) -> List Path -> Html a
 render ( width, height ) paths =
     Svg.svg
-        [ Svg.Attributes.width (width |> toString)
+        [ Svg.Attributes.class "screen"
+        , Svg.Attributes.width (width |> toString)
         , Svg.Attributes.height (height |> toString)
         ]
         [ Svg.node "style"

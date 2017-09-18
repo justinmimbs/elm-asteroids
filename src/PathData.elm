@@ -1,4 +1,4 @@
-module PathData exposing (PathData, Command(..), toString, toPolylines, scale)
+module PathData exposing (PathData, Command(..), toString, toPolylines, fromPolylines, scale, translate, mapPoints)
 
 import Geometry.Vector as Vector exposing (Point)
 
@@ -80,22 +80,61 @@ toPolylines segmentLength =
         []
 
 
-scaleCommand : Float -> Command -> Command
-scaleCommand s command =
-    case command of
-        M x y ->
-            M (x * s) (y * s)
+fromPolylines : List (List Point) -> PathData
+fromPolylines =
+    List.foldr
+        (\polyline d ->
+            case polyline of
+                ( mx, my ) :: ls ->
+                    M mx my :: (ls |> List.map lineTo) ++ d
 
-        L x y ->
-            L (x * s) (y * s)
-
-        C a b c d x y ->
-            C (a * s) (b * s) (c * s) (d * s) (x * s) (y * s)
+                [] ->
+                    d
+        )
+        []
 
 
 scale : Float -> PathData -> PathData
 scale =
-    scaleCommand >> List.map
+    Vector.scale >> mapPoints
+
+
+translate : Point -> PathData -> PathData
+translate =
+    Vector.add >> mapPoints
+
+
+mapPoints : (Point -> Point) -> PathData -> PathData
+mapPoints =
+    commandMapPoints >> List.map
+
+
+commandMapPoints : (Point -> Point) -> Command -> Command
+commandMapPoints f command =
+    case command of
+        M x y ->
+            moveTo (f ( x, y ))
+
+        L x y ->
+            lineTo (f ( x, y ))
+
+        C a b c d x y ->
+            cubicTo (f ( a, b )) (f ( c, d )) (f ( x, y ))
+
+
+moveTo : Point -> Command
+moveTo =
+    uncurry M
+
+
+lineTo : Point -> Command
+lineTo =
+    uncurry L
+
+
+cubicTo : Point -> Point -> Point -> Command
+cubicTo ( a, b ) ( c, d ) ( x, y ) =
+    C a b c d x y
 
 
 

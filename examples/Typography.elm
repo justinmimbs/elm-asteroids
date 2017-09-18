@@ -14,10 +14,6 @@ import Geometry.Vector as Vector exposing (Point)
 import PathData exposing (PathData)
 
 
-type alias Circle =
-    ( Point, Float )
-
-
 astraeaPathData =
     { p16 = Astraea.pathData |> Font.scale PathData.scale (1 / 3) |> updateWidth ((+) 1.5)
     , p24 = Astraea.pathData |> Font.scale PathData.scale 0.5 |> updateWidth ((+) 2)

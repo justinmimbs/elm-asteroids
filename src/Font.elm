@@ -1,4 +1,4 @@
-module Font exposing (Font, map, scale, typesetLine)
+module Font exposing (Font, map, scale, getCharacter, typesetLine)
 
 import Dict exposing (Dict)
 
@@ -28,8 +28,15 @@ scale f s font =
         |> map (f s)
 
 
+getCharacter : Char -> Font a -> a
+getCharacter char font =
+    font.characters
+        |> Dict.get char
+        |> Maybe.withDefault font.replacement
+
+
 typesetLine : (Float -> a -> b) -> Font a -> Float -> String -> List b
-typesetLine typesetChar font initialOffset string =
+typesetLine typesetCharacter font initialOffset string =
     string
         |> String.toList
         |> List.foldl
@@ -38,10 +45,9 @@ typesetLine typesetChar font initialOffset string =
                 , if char == ' ' then
                     list
                   else
-                    font.characters
-                        |> Dict.get char
-                        |> Maybe.withDefault font.replacement
-                        |> typesetChar offset
+                    font
+                        |> getCharacter char
+                        |> typesetCharacter offset
                         |> (flip (::)) list
                 )
             )

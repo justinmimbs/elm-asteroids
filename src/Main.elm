@@ -3,6 +3,7 @@ module Main exposing (main)
 import AnimationFrame
 import Html exposing (Html)
 import Html.Attributes
+import Html.Lazy
 import Keyboard
 import Random.Pcg as Random
 import Time exposing (Time)
@@ -17,6 +18,7 @@ import Geometry.Vector as Vector exposing (Point)
 import Level exposing (Controls, Level)
 import PathData exposing (PathData)
 import Screen
+import Static
 import Types exposing (Moving, Positioned, Polyline)
 import Util exposing (transformPoints, wrapPosition)
 
@@ -268,10 +270,12 @@ viewPaths paths =
     Html.div
         [ Html.Attributes.style
             [ ( "display", "flex" )
-            , ( "justify-content", "center" )
+            , ( "flex-direction", "column" )
+            , ( "align-items", "center" )
             ]
         ]
         [ paths |> Screen.render screenSize
+        , Html.Lazy.lazy identity Static.instructions
         ]
 
 
