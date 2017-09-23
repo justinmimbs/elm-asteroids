@@ -3,7 +3,6 @@ module Main exposing (main)
 import AnimationFrame
 import Html exposing (Html)
 import Html.Attributes
-import Html.Lazy
 import Keyboard
 import Random.Pcg as Random
 import Time exposing (Time)
@@ -237,45 +236,52 @@ view ( _, state ) =
             ("ASTEROIDS" |> typeset largeFont screenCenter)
                 ++ ("PRESS ENTER" |> typeset smallFont (screenCenter |> Vector.add ( 0, 3 * smallFont.height )))
                 ++ (asteroids |> List.map asteroidToPath)
-                |> viewPaths
+                |> viewMain
 
         LevelTitle n level _ ->
             ("LEVEL " ++ toString n |> typeset mediumFont (screenCenter |> Vector.add ( 0, 0.5 * mediumFont.height )))
                 ++ (level |> Level.asteroidsToPaths)
-                |> viewPaths
+                |> viewMain
 
         Playing _ level _ ->
-            level |> Level.toPaths |> viewPaths
+            level |> Level.toPaths |> viewMain
 
         Cleared _ level _ timer ->
             if timer > 2 then
-                level |> Level.toPaths |> viewPaths
+                level |> Level.toPaths |> viewMain
             else
                 ("CLEARED" |> typeset mediumFont (screenCenter |> Vector.add ( 0, 0.5 * mediumFont.height )))
                     ++ (level |> Level.toPaths)
-                    |> viewPaths
+                    |> viewMain
 
         Destroyed _ level timer ->
             if timer > 5 then
-                level |> Level.toPaths |> viewPaths
+                level |> Level.toPaths |> viewMain
             else
                 ("PRESS ENTER TO CONTINUE" |> typeset smallFont (screenCenter |> Vector.add ( 0, -2 * smallFont.height )))
                     ++ (timer |> ceiling |> toString |> typeset mediumFont (screenCenter |> Vector.add ( 0, 1 * mediumFont.height )))
                     ++ (level |> Level.toPaths)
-                    |> viewPaths
+                    |> viewMain
 
 
-viewPaths : List Screen.Path -> Html a
-viewPaths paths =
-    Html.div
-        [ Html.Attributes.style
-            [ ( "display", "flex" )
-            , ( "flex-direction", "column" )
-            , ( "align-items", "center" )
+viewMain : List Screen.Path -> Html a
+viewMain paths =
+    Html.main_
+        []
+        [ Html.node "style"
+            []
+            [ Html.text "@import url(../app/style.css);"
             ]
-        ]
-        [ paths |> Screen.render screenSize
-        , Html.Lazy.lazy identity Static.instructions
+        , Html.div
+            [ Html.Attributes.class "screen-container"
+            ]
+            [ paths |> Screen.render screenSize
+            ]
+        , Html.div
+            [ Html.Attributes.class "instructions-container"
+            ]
+            [ Static.instructions
+            ]
         ]
 
 

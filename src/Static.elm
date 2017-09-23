@@ -32,14 +32,16 @@ instructions =
     in
         Svg.svg
             [ Svg.Attributes.class "instructions"
-            , Svg.Attributes.width (sectionWidth * List.length sections |> toString)
-            , Svg.Attributes.height "200"
+            , Svg.Attributes.viewBox ([ 0, 0, sectionWidth * (List.length sections + 2), 180 ] |> List.map toString |> String.join " ")
+            , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
+            , Svg.Attributes.width "auto"
+            , Svg.Attributes.height "auto"
             ]
             (sections
                 |> List.indexedMap
                     (\i ( keyIcon, line1, line2 ) ->
                         Svg.g
-                            [ Svg.Attributes.transform (translate ( sectionWidth / 2 + toFloat i * sectionWidth + 0.5, iconSize * 4 + 0.5 ))
+                            [ Svg.Attributes.transform (translate ( sectionWidth * 1.5 + toFloat i * sectionWidth + 0.5, iconSize * 2 + 0.5 ))
                             ]
                             (viewSection iconSize keyIcon line1 line2)
                     )

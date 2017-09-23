@@ -1,6 +1,5 @@
 module Screen exposing (Path, render)
 
-import Html exposing (Html)
 import Svg exposing (Svg)
 import Svg.Attributes
 
@@ -19,18 +18,16 @@ screenId =
     "screen"
 
 
-render : ( Float, Float ) -> List Path -> Html a
+render : ( Float, Float ) -> List Path -> Svg a
 render ( width, height ) paths =
     Svg.svg
         [ Svg.Attributes.class "screen"
-        , Svg.Attributes.width (width |> toString)
-        , Svg.Attributes.height (height |> toString)
+        , Svg.Attributes.viewBox ([ 0, 0, width, height ] |> List.map toString |> String.join " ")
+        , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
+        , Svg.Attributes.width "auto"
+        , Svg.Attributes.height "auto"
         ]
-        [ Svg.node "style"
-            []
-            [ Svg.text "@import url(../app/style.css);"
-            ]
-        , Svg.defs
+        [ Svg.defs
             []
             [ Svg.g
                 [ Svg.Attributes.id screenId ]
