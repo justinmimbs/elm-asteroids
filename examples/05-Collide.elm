@@ -1,7 +1,8 @@
-module Collide exposing (..)
+module Main exposing (main)
 
 import AnimationFrame
 import Html exposing (Html)
+import Html.Attributes
 import Mouse
 import Time exposing (Time)
 
@@ -23,7 +24,11 @@ main =
         , update = \x r -> ( update x r, Cmd.none )
         , view =
             List.head
-                >> Maybe.map (List.map (transformPolygon >> (,,) 1 True) >> Screen.render screenSize)
+                >> Maybe.map
+                    (List.map (transformPolygon >> (,,) 1 True)
+                        >> Screen.render screenSize
+                        >> viewContainer
+                    )
                 >> Maybe.withDefault (Html.text "")
         , subscriptions =
             Sub.batch
@@ -32,6 +37,20 @@ main =
                 ]
                 |> always
         }
+
+
+viewContainer : Html a -> Html a
+viewContainer content =
+    Html.div
+        [ Html.Attributes.style
+            [ ( "height", "100vh" )
+            , ( "fill", "none" )
+            , ( "stroke", "gray" )
+            , ( "stroke-width", "2px" )
+            ]
+        ]
+        [ content
+        ]
 
 
 init : List (List Disk)

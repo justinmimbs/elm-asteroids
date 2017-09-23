@@ -1,4 +1,4 @@
-module Typography exposing (main)
+module Main exposing (main)
 
 import Dict exposing (Dict)
 import Html exposing (Html)

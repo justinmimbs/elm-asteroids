@@ -1,6 +1,7 @@
-module AsteroidShapes exposing (main)
+module Main exposing (main)
 
 import Html exposing (Html)
+import Html.Attributes
 import Random.Pcg as Random
 
 
@@ -21,6 +22,15 @@ main =
             (\pos object -> { object | position = pos } |> asteroidToPath)
             (gridPositions ( 7, 5 ) ( 150, 150 ) |> List.map (Vector.add ( 150, 150 )))
         |> Screen.render ( 1200, 900 )
+        |> List.singleton
+        |> Html.div
+            [ Html.Attributes.style
+                [ ( "height", "100vh" )
+                , ( "fill", "none" )
+                , ( "stroke", "gray" )
+                , ( "stroke-width", "2px" )
+                ]
+            ]
 
 
 asteroidToPath : Asteroid -> Screen.Path

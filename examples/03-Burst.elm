@@ -1,7 +1,8 @@
-module Burst exposing (main)
+module Main exposing (main)
 
 import AnimationFrame
 import Html exposing (Html)
+import Html.Attributes
 import Json.Decode exposing (Decoder)
 import Random.Pcg as Random exposing (Generator)
 import Svg exposing (Svg)
@@ -165,10 +166,19 @@ view { drag, particles, polygon } =
                 , particles |> List.map particleToPath
                 ]
     in
-        Svg.svg
-            (attributes ++ events)
-            [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
-            , paths |> Screen.render screenSize
+        Html.div
+            [ Html.Attributes.style
+                [ ( "height", "100vh" )
+                , ( "fill", "none" )
+                , ( "stroke", "gray" )
+                , ( "stroke-width", "2px" )
+                ]
+            ]
+            [ Svg.svg
+                (attributes ++ events)
+                [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
+                , paths |> Screen.render screenSize
+                ]
             ]
 
 
@@ -184,7 +194,7 @@ viewLine ( ( x1, y1 ), ( x2, y2 ) ) =
         , Svg.Attributes.y1 (y1 |> px)
         , Svg.Attributes.x2 (x2 |> px)
         , Svg.Attributes.y2 (y2 |> px)
-        , Svg.Attributes.style "stroke: rgba(255, 255, 255, 0.2)"
+        , Svg.Attributes.style "stroke: rgba(0, 0, 0, 0.1)"
         ]
         []
 

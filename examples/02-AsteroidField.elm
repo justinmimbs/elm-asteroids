@@ -1,7 +1,8 @@
-module AsteroidShapes exposing (main)
+module Main exposing (main)
 
 import AnimationFrame
 import Html exposing (Html)
+import Html.Attributes
 import Random.Pcg as Random
 import Time exposing (Time)
 
@@ -20,9 +21,23 @@ main =
     Html.program
         { init = ( initField, Cmd.none )
         , update = \x r -> ( update x r, Cmd.none )
-        , view = List.map asteroidToPath >> Screen.render screenSize
+        , view = List.map asteroidToPath >> Screen.render screenSize >> viewContainer
         , subscriptions = always (AnimationFrame.diffs Time.inSeconds)
         }
+
+
+viewContainer : Html a -> Html a
+viewContainer content =
+    Html.div
+        [ Html.Attributes.style
+            [ ( "height", "100vh" )
+            , ( "fill", "none" )
+            , ( "stroke", "gray" )
+            , ( "stroke-width", "2px" )
+            ]
+        ]
+        [ content
+        ]
 
 
 update : Time -> List Asteroid -> List Asteroid
