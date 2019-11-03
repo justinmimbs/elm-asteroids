@@ -1,4 +1,4 @@
-module PathData exposing (PathData, Command(..), toString, toPolylines, fromPolylines, scale, translate, mapPoints)
+module PathData exposing (Command(..), PathData, fromPolylines, mapPoints, scale, toPolylines, toString, translate)
 
 import Geometry.Vector as Vector exposing (Point)
 
@@ -22,13 +22,13 @@ commandToString : Command -> String
 commandToString command =
     (case command of
         M x y ->
-            "M" :: ([ x, y ] |> List.map Basics.toString)
+            "M" :: ([ x, y ] |> List.map String.fromFloat)
 
         L x y ->
-            "L" :: ([ x, y ] |> List.map Basics.toString)
+            "L" :: ([ x, y ] |> List.map String.fromFloat)
 
         C a b c d x y ->
-            "C" :: ([ a, b, c, d, x, y ] |> List.map Basics.toString)
+            "C" :: ([ a, b, c, d, x, y ] |> List.map String.fromFloat)
     )
         |> String.join " "
 
@@ -37,14 +37,14 @@ bezierToPolyline : Float -> List Point -> List Point
 bezierToPolyline segmentLength controlPoints =
     let
         hullLength =
-            controlPoints |> foldPairs (Vector.distance >>> (+)) 0
+            controlPoints |> foldPairs (\a b length -> Vector.distance a b + length) 0
 
         n =
             hullLength / segmentLength |> ceiling
     in
-        List.range 0 n
-            |> List.map
-                (\i -> pointOnBezier (toFloat i / toFloat n) controlPoints)
+    List.range 0 n
+        |> List.map
+            (\i -> pointOnBezier (toFloat i / toFloat n) controlPoints)
 
 
 pointOnBezier : Float -> List Point -> Point
@@ -85,8 +85,8 @@ fromPolylines =
     List.foldr
         (\polyline d ->
             case polyline of
-                ( mx, my ) :: ls ->
-                    M mx my :: (ls |> List.map lineTo) ++ d
+                ( x, y ) :: points ->
+                    M x y :: (points |> List.map lineTo) ++ d
 
                 [] ->
                     d
@@ -123,13 +123,13 @@ commandMapPoints f command =
 
 
 moveTo : Point -> Command
-moveTo =
-    uncurry M
+moveTo ( x, y ) =
+    M x y
 
 
 lineTo : Point -> Command
-lineTo =
-    uncurry L
+lineTo ( x, y ) =
+    L x y
 
 
 cubicTo : Point -> Point -> Point -> Command
@@ -156,13 +156,4 @@ will be one less than the given list.
 -}
 mapPairs : (a -> a -> b) -> List a -> List b
 mapPairs f =
-    foldPairs (\x y -> f x y |> (::)) [] >> List.reverse
-
-
-
---
-
-
-(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
-(>>>) f g x y =
-    g (f x y)
+    foldPairs (\x y r -> f x y :: r) [] >> List.reverse

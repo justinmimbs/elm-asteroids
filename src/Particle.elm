@@ -1,14 +1,10 @@
 module Particle exposing (Particle, burst, explode)
 
-import Random.Pcg as Random exposing (Generator)
-
-
--- project
-
 import Geometry.Line as Line
 import Geometry.Polygon as Polygon exposing (Polygon)
 import Geometry.Vector as Vector
-import Types exposing (Radians, Polyline, Positioned, Moving, Expiring)
+import Random exposing (Generator)
+import Types exposing (Expiring, Moving, Polyline, Positioned, Radians)
 
 
 type alias Particle =
@@ -31,8 +27,8 @@ burstRadial speed radius n =
         sectionAngle =
             (pi * 2) / toFloat n
     in
-        List.range 1 n
-            |> List.map (\i -> burstRadialParticle speed radius (toFloat (i % 5) * 0.5 + 0.5) (toFloat i * sectionAngle))
+    List.range 1 n
+        |> List.map (\i -> burstRadialParticle speed radius (toFloat (i |> remainderBy 5) * 0.5 + 0.5) (toFloat i * sectionAngle))
 
 
 burstRadialParticle : Float -> Float -> Float -> Radians -> Particle
@@ -66,13 +62,13 @@ explodePolygon speed radius polygon =
                     center =
                         Line.midpoint a b
                 in
-                    { polyline = [ a, b ] |> List.map (Vector.sub center)
-                    , position = center
-                    , rotation = 0
-                    , velocity = ( speed, Vector.angle center ) |> fromPolar
-                    , angularVelocity = 0
-                    , timeRemaining = radius / speed
-                    }
+                { polyline = [ a, b ] |> List.map (Vector.sub center)
+                , position = center
+                , rotation = 0
+                , velocity = ( speed, Vector.angle center ) |> fromPolar
+                , angularVelocity = 0
+                , timeRemaining = radius / speed
+                }
             )
 
 

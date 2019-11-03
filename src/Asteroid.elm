@@ -1,13 +1,9 @@
 module Asteroid exposing (Asteroid, asteroid, field)
 
-import Random.Pcg as Random exposing (Generator)
-
-
--- project modules
-
 import Geometry.Polygon exposing (Polygon)
 import Geometry.Vector exposing (Point, distanceSquared)
-import Types exposing (Boundaried, Positioned, Moving)
+import Random exposing (Generator)
+import Types exposing (Boundaried, Moving, Positioned)
 
 
 type alias Asteroid =
@@ -25,11 +21,24 @@ field ( width, height ) exclusionRadius count =
         (Random.map2
             setPosition
             (Random.pair (Random.float 0 width) (Random.float 0 height)
-                |> Random.filter
-                    (distanceSquared ( width / 2, height / 2 ) >> ((<) (exclusionRadius ^ 2)))
+                |> filter
+                    (distanceSquared ( width / 2, height / 2 ) >> (<) (exclusionRadius ^ 2))
             )
             asteroid
         )
+
+
+filter : (a -> Bool) -> Generator a -> Generator a
+filter predicate generator =
+    Random.andThen
+        (\x ->
+            if predicate x then
+                Random.constant x
+
+            else
+                filter predicate generator
+        )
+        generator
 
 
 setPosition : x -> { a | position : x } -> { a | position : x }
@@ -79,6 +88,6 @@ toShape list =
         segmentAngle =
             pi * 2 / toFloat (List.length list)
     in
-        list
-            |> List.indexedMap
-                (\i ( radius, scale ) -> ( radius, segmentAngle * toFloat i + segmentAngle * scale ) |> fromPolar)
+    list
+        |> List.indexedMap
+            (\i ( radius, scale ) -> ( radius, segmentAngle * toFloat i + segmentAngle * scale ) |> fromPolar)

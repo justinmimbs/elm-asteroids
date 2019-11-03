@@ -1,8 +1,8 @@
-module Physics exposing (Movement, impulse, Collidable, collide)
+module Physics exposing (Collidable, Movement, collide, impulse)
 
 import Geometry.Matrix as Matrix
 import Geometry.Polygon as Polygon exposing (Polygon)
-import Geometry.Vector as Vector exposing (Vector, Point)
+import Geometry.Vector as Vector exposing (Point, Vector)
 
 
 type alias Radians =
@@ -28,20 +28,21 @@ impulse velocity contact center =
             angleFrom (Vector.normalize velocity) direction
 
         angSpeed =
-            (speed / (Vector.distance center contact)) * signum angle
+            (speed / Vector.distance center contact) * signum angle
 
         -- rotation alpha
         t =
             abs angle / (pi / 2)
     in
-        ( direction |> Vector.scale (speed * (1 - t))
-        , angSpeed
-            * (if t > 1 then
-                2 - t
-               else
-                t
-              )
-        )
+    ( direction |> Vector.scale (speed * (1 - t))
+    , angSpeed
+        * (if t > 1 then
+            2 - t
+
+           else
+            t
+          )
+    )
 
 
 type alias Collidable a =
@@ -67,6 +68,7 @@ contactPoint a b =
             (transformPolygon a)
             (transformPolygon b)
             |> meanPoint
+
     else
         Nothing
 
@@ -105,53 +107,54 @@ collideAtPoint e a b contact =
         bToward =
             angleBetween bContactVelocity (Vector.sub a.position contact) < pi / 2
     in
-        if aToward && bToward || aToward && aSpeed > bSpeed || bToward && bSpeed > aSpeed then
-            let
-                ( aMass, bMass ) =
-                    ( a.radius ^ 2, b.radius ^ 2 )
+    if aToward && bToward || aToward && aSpeed > bSpeed || bToward && bSpeed > aSpeed then
+        let
+            ( aMass, bMass ) =
+                ( a.radius ^ 2, b.radius ^ 2 )
 
-                t =
-                    aMass / (aMass + bMass)
+            t =
+                aMass / (aMass + bMass)
 
-                aReflect =
-                    a.velocity |> Vector.reflect (Vector.direction b.position a.position)
+            aReflect =
+                a.velocity |> Vector.reflect (Vector.direction b.position a.position)
 
-                bReflect =
-                    b.velocity |> Vector.reflect (Vector.direction a.position b.position)
+            bReflect =
+                b.velocity |> Vector.reflect (Vector.direction a.position b.position)
 
-                ( aPush, aSpin ) =
-                    a.position |> impulse bContactVelocity contact
+            ( aPush, aSpin ) =
+                a.position |> impulse bContactVelocity contact
 
-                ( bPush, bSpin ) =
-                    b.position |> impulse aContactVelocity contact
+            ( bPush, bSpin ) =
+                b.position |> impulse aContactVelocity contact
 
-                inelasticVel =
-                    Vector.interpolate t b.velocity a.velocity
+            inelasticVel =
+                Vector.interpolate t b.velocity a.velocity
 
-                inelasticAngVel =
-                    interpolate t b.angularVelocity a.angularVelocity
-            in
-                Just
-                    ( ( a.velocity
-                            |> Vector.interpolate (0 + t) aReflect
-                            |> Vector.add (aPush |> Vector.scale ((1 - t) * 2))
-                            |> Vector.interpolate e inelasticVel
-                      , a.angularVelocity
-                            |> interpolate (0 + t) aSpin
-                            |> interpolate e inelasticAngVel
-                      )
-                    , ( b.velocity
-                            |> Vector.interpolate (1 - t) bReflect
-                            |> Vector.add (bPush |> Vector.scale ((0 + t) * 2))
-                            |> Vector.interpolate e inelasticVel
-                      , b.angularVelocity
-                            |> interpolate (1 - t) bSpin
-                            |> interpolate e inelasticAngVel
-                      )
-                    , contact
-                    )
-        else
-            Nothing
+            inelasticAngVel =
+                interpolate t b.angularVelocity a.angularVelocity
+        in
+        Just
+            ( ( a.velocity
+                    |> Vector.interpolate (0 + t) aReflect
+                    |> Vector.add (aPush |> Vector.scale ((1 - t) * 2))
+                    |> Vector.interpolate e inelasticVel
+              , a.angularVelocity
+                    |> interpolate (0 + t) aSpin
+                    |> interpolate e inelasticAngVel
+              )
+            , ( b.velocity
+                    |> Vector.interpolate (1 - t) bReflect
+                    |> Vector.add (bPush |> Vector.scale ((0 + t) * 2))
+                    |> Vector.interpolate e inelasticVel
+              , b.angularVelocity
+                    |> interpolate (1 - t) bSpin
+                    |> interpolate e inelasticAngVel
+              )
+            , contact
+            )
+
+    else
+        Nothing
 
 
 transformPolygon : Collidable a -> Polygon
@@ -167,7 +170,7 @@ tangentialVelocity radial angularVelocity =
         ( radius, angle ) =
             radial |> toPolar
     in
-        ( radius * angularVelocity, angle + (pi / 2) ) |> fromPolar
+    ( radius * angularVelocity, angle + (pi / 2) ) |> fromPolar
 
 
 angleBetween : Vector -> Vector -> Float
@@ -186,8 +189,10 @@ signum : Float -> Float
 signum x =
     if x > 0 then
         1
+
     else if x == 0 then
         0
+
     else
         -1
 

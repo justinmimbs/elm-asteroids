@@ -1,6 +1,6 @@
 module Geometry.Circle exposing (Circle, enclose)
 
-import Geometry.Line as Line exposing (Intersection(LineLine), midpoint)
+import Geometry.Line as Line exposing (Intersection(..), midpoint)
 import Geometry.Vector exposing (Point, distanceSquared)
 
 
@@ -13,7 +13,7 @@ circumcenter3 a b c =
         ( p3, p4 ) =
             Line.perpendicularBisector a c
     in
-        Line.intersect LineLine p1 p2 p3 p4
+    Line.intersect LineLine p1 p2 p3 p4
 
 
 
@@ -55,7 +55,7 @@ circumcirc2 a b =
         center =
             midpoint a b
     in
-        ( center, distanceSquared a center )
+    ( center, distanceSquared a center )
 
 
 circumcirc3 : Point -> Point -> Point -> Maybe Circ
@@ -79,14 +79,17 @@ enclose3 a b c =
         bc =
             circumcirc2 b c
     in
-        if isEnclosed ab c then
-            ab
-        else if isEnclosed ac b then
-            ac
-        else if isEnclosed bc a then
-            bc
-        else
-            circumcirc3 a b c |> Maybe.withDefault ( a, 0 )
+    if isEnclosed ab c then
+        ab
+
+    else if isEnclosed ac b then
+        ac
+
+    else if isEnclosed bc a then
+        bc
+
+    else
+        circumcirc3 a b c |> Maybe.withDefault ( a, 0 )
 
 
 
@@ -124,5 +127,6 @@ encloseHelp points a b c enclosed circ =
         p :: rest ->
             if p |> isEnclosed circ then
                 encloseHelp rest a b c (p :: enclosed) circ
+
             else
                 encloseHelp (c :: enclosed ++ rest) p a b [] (enclose3 p a b)

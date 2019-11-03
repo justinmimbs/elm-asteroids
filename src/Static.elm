@@ -1,16 +1,12 @@
 module Static exposing (instructions)
 
-import Svg exposing (Svg)
-import Svg.Attributes
-
-
--- project
-
 import Font exposing (Font)
 import Font.Astraea as Astraea
 import Geometry.Vector as Vector exposing (Point)
-import PathData exposing (PathData, Command(M, L))
+import PathData exposing (Command(..), PathData)
 import Screen
+import Svg exposing (Svg)
+import Svg.Attributes
 
 
 instructions : Svg a
@@ -30,22 +26,22 @@ instructions =
             , ( arrowRight, "ROTATE", "RIGHT" )
             ]
     in
-        Svg.svg
-            [ Svg.Attributes.class "instructions"
-            , Svg.Attributes.viewBox ([ 0, 0, sectionWidth * (List.length sections + 2), 180 ] |> List.map toString |> String.join " ")
-            , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
-            , Svg.Attributes.width "auto"
-            , Svg.Attributes.height "auto"
-            ]
-            (sections
-                |> List.indexedMap
-                    (\i ( keyIcon, line1, line2 ) ->
-                        Svg.g
-                            [ Svg.Attributes.transform (translate ( sectionWidth * 1.5 + toFloat i * sectionWidth + 0.5, iconSize * 2 + 0.5 ))
-                            ]
-                            (viewSection iconSize keyIcon line1 line2)
-                    )
-            )
+    Svg.svg
+        [ Svg.Attributes.class "instructions"
+        , Svg.Attributes.viewBox ([ 0, 0, sectionWidth * (List.length sections + 2), 180 ] |> List.map String.fromInt |> String.join " ")
+        , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
+        , Svg.Attributes.width "auto"
+        , Svg.Attributes.height "auto"
+        ]
+        (sections
+            |> List.indexedMap
+                (\i ( keyIcon, line1, line2 ) ->
+                    Svg.g
+                        [ Svg.Attributes.transform (translate (sectionWidth * 1.5 + toFloat i * sectionWidth + 0.5) (iconSize * 2 + 0.5))
+                        ]
+                        (viewSection iconSize keyIcon line1 line2)
+                )
+        )
 
 
 viewSection : Float -> PathData -> String -> String -> List (Svg a)
@@ -57,39 +53,39 @@ viewSection iconSize keyIcon line1 line2 =
         keySize =
             iconSize + keyPadding * 2
     in
-        [ roundRect ( keySize / -2, 0 ) keySize keySize 4
-        , keyIcon |> viewPath ( keySize / -2 + keyPadding, keyPadding )
-        , Svg.g
-            []
-            ((line1 |> typeset astraea16 ( 0, keySize + 2 * astraea16.height ))
-                ++ (line2 |> typeset astraea16 ( 0, keySize + 3.5 * astraea16.height ))
-            )
-        ]
+    [ roundRect ( keySize / -2, 0 ) keySize keySize 4
+    , keyIcon |> viewPath (keySize / -2 + keyPadding) keyPadding
+    , Svg.g
+        []
+        ((line1 |> typeset astraea16 ( 0, keySize + 2 * astraea16.height ))
+            ++ (line2 |> typeset astraea16 ( 0, keySize + 3.5 * astraea16.height ))
+        )
+    ]
 
 
-viewPath : Point -> PathData -> Svg a
-viewPath offset d =
+viewPath : Float -> Float -> PathData -> Svg a
+viewPath x y d =
     Svg.path
         [ Svg.Attributes.d (d |> PathData.toString)
-        , Svg.Attributes.transform (translate offset)
+        , Svg.Attributes.transform (translate x y)
         ]
         []
 
 
-translate : Point -> String
-translate ( x, y ) =
-    "translate(" ++ toString x ++ ", " ++ toString y ++ ")"
+translate : Float -> Float -> String
+translate x y =
+    "translate(" ++ String.fromFloat x ++ ", " ++ String.fromFloat y ++ ")"
 
 
 roundRect : Point -> Float -> Float -> Float -> Svg a
 roundRect ( x, y ) width height r =
     Svg.rect
-        [ Svg.Attributes.x (x |> toString)
-        , Svg.Attributes.y (y |> toString)
-        , Svg.Attributes.width (width |> toString)
-        , Svg.Attributes.height (height |> toString)
-        , Svg.Attributes.rx (r |> toString)
-        , Svg.Attributes.ry (r |> toString)
+        [ Svg.Attributes.x (x |> String.fromFloat)
+        , Svg.Attributes.y (y |> String.fromFloat)
+        , Svg.Attributes.width (width |> String.fromFloat)
+        , Svg.Attributes.height (height |> String.fromFloat)
+        , Svg.Attributes.rx (r |> String.fromFloat)
+        , Svg.Attributes.ry (r |> String.fromFloat)
         ]
         []
 
@@ -116,7 +112,7 @@ typeset font ( cx, cy ) text =
             , cy - font.height
             )
     in
-        text |> Font.typesetLine ((flip (,)) oy >> viewPath) font ox
+    text |> Font.typesetLine (\x char -> viewPath x oy char) font ox
 
 
 

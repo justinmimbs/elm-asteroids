@@ -1,24 +1,22 @@
-module Geometry.Vector
-    exposing
-        ( Vector
-        , Point
-        , zero
-        , length
-        , lengthSquared
-        , angle
-        , normalize
-        , negate
-        , scale
-        , add
-        , sub
-        , dot
-        , cross
-        , distance
-        , distanceSquared
-        , direction
-        , reflect
-        , interpolate
-        )
+module Geometry.Vector exposing
+    ( Vector, Point, zero
+    , length, lengthSquared, angle
+    , normalize, negate
+    , scale, add, sub
+    , dot, cross, distance, distanceSquared
+    , direction, reflect, interpolate
+    )
+
+{-|
+
+@docs Vector, Point, zero
+@docs length, lengthSquared, angle
+@docs normalize, negate
+@docs scale, add, sub
+@docs dot, cross, distance, distanceSquared
+@docs direction, reflect, interpolate
+
+-}
 
 
 type alias Vector =
@@ -55,12 +53,13 @@ normalize (( x, y ) as vec) =
         len =
             length vec
     in
-        if len == 0 then
-            zero
-        else
-            ( x / len
-            , y / len
-            )
+    if len == 0 then
+        zero
+
+    else
+        ( x / len
+        , y / len
+        )
 
 
 negate : Vector -> Vector

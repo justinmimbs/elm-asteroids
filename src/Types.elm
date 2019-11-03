@@ -1,12 +1,11 @@
 module Types exposing (..)
 
-import Time exposing (Time)
-
-
--- project
-
 import Geometry.Polygon exposing (Polygon)
-import Geometry.Vector exposing (Vector, Point)
+import Geometry.Vector exposing (Point, Vector)
+
+
+type alias Time =
+    Float
 
 
 type alias Radians =

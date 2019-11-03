@@ -1,4 +1,4 @@
-module Font exposing (Font, map, scale, getCharacter, typesetLine)
+module Font exposing (Font, getCharacter, map, scale, typesetLine)
 
 import Dict exposing (Dict)
 
@@ -13,17 +13,19 @@ type alias Font a =
 
 map : (a -> b) -> Font a -> Font b
 map f font =
-    { font
-        | replacement = f font.replacement
-        , characters = font.characters |> Dict.map (always f)
+    { width = font.width
+    , height = font.height
+    , replacement = f font.replacement
+    , characters = font.characters |> Dict.map (always f)
     }
 
 
 scale : (Float -> a -> a) -> Float -> Font a -> Font a
 scale f s font =
-    { font
-        | width = font.width * s
-        , height = font.height * s
+    { width = font.width * s
+    , height = font.height * s
+    , replacement = font.replacement
+    , characters = font.characters
     }
         |> map (f s)
 
@@ -44,11 +46,13 @@ typesetLine typesetCharacter font initialOffset string =
                 ( offset + font.width
                 , if char == ' ' then
                     list
+
                   else
-                    font
+                    (font
                         |> getCharacter char
                         |> typesetCharacter offset
-                        |> (flip (::)) list
+                    )
+                        :: list
                 )
             )
             ( initialOffset, [] )

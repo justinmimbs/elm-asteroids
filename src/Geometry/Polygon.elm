@@ -1,6 +1,6 @@
-module Geometry.Polygon exposing (Polygon, ngon, fold, toSegments, split, intersectionsWithSegment, intersectionsWithPolygon)
+module Geometry.Polygon exposing (Polygon, fold, intersectionsWithPolygon, intersectionsWithSegment, ngon, split, toSegments)
 
-import Geometry.Line as Line exposing (Intersection(LineSegment, SegmentSegment))
+import Geometry.Line as Line exposing (Intersection(..))
 import Geometry.Vector exposing (Point)
 
 
@@ -18,8 +18,8 @@ ngon n =
         sectionAngle =
             (pi * 2) / toFloat n
     in
-        List.range 1 n
-            |> List.map (toFloat >> (*) sectionAngle >> (,) 1 >> fromPolar)
+    List.range 1 n
+        |> List.map (\i -> ( 1, toFloat i * sectionAngle ) |> fromPolar)
 
 
 
@@ -55,7 +55,7 @@ foldHelp head f2 result list =
 toSegments : Polygon -> List ( Point, Point )
 toSegments =
     fold
-        ((,) >>> (::))
+        (\a b segments -> ( a, b ) :: segments)
         []
 
 
@@ -122,6 +122,7 @@ sortSplitPoints ( intersections, result ) list =
                 p1 :: p2 :: _ ->
                     if compare p p1 /= compare p1 p2 then
                         result ++ List.reverse list
+
                     else
                         sortSplitPoints ( p :: intersections, I p :: result ) rest
 
@@ -146,6 +147,7 @@ fromSplitPoints ( working, waiting, completed ) list =
             if waiting |> List.isEmpty then
                 -- start new polygon
                 fromSplitPoints ( p :: waiting, p :: working, completed ) rest
+
             else
                 -- end current polygon
                 fromSplitPoints ( p :: waiting, [], (p :: working) :: completed ) rest
@@ -158,7 +160,14 @@ fromSplitPoints ( working, waiting, completed ) list =
 intersectionsWithSegment : Point -> Point -> Polygon -> List Point
 intersectionsWithSegment a b =
     fold
-        (Line.intersect SegmentSegment a b >>> unwrap identity (::))
+        (\c d points ->
+            case Line.intersect SegmentSegment a b c d of
+                Just p ->
+                    p :: points
+
+                Nothing ->
+                    points
+        )
         []
 
 
@@ -167,22 +176,3 @@ intersectionsWithPolygon polygon =
     fold
         (\a b -> intersectionsWithSegment a b polygon |> (++))
         []
-
-
-
---
-
-
-unwrap : b -> (a -> b) -> Maybe a -> b
-unwrap default f m =
-    case m of
-        Just x ->
-            f x
-
-        Nothing ->
-            default
-
-
-(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
-(>>>) f g x y =
-    g (f x y)

@@ -1,16 +1,15 @@
 module Screen exposing (Path, render)
 
+import Geometry.Vector exposing (Point)
 import Svg exposing (Svg)
 import Svg.Attributes
 
 
--- project
-
-import Geometry.Vector exposing (Point)
-
-
 type alias Path =
-    ( Float, Bool, List Point )
+    { opacity : Float
+    , closed : Bool
+    , points : List Point
+    }
 
 
 screenId : String
@@ -19,50 +18,56 @@ screenId =
 
 
 render : ( Float, Float ) -> List Path -> Svg a
-render ( width, height ) paths =
-    Svg.svg
-        [ Svg.Attributes.class "screen"
-        , Svg.Attributes.viewBox ([ 0, 0, width, height ] |> List.map toString |> String.join " ")
-        , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
-        , Svg.Attributes.width "auto"
-        , Svg.Attributes.height "auto"
-        ]
-        [ Svg.defs
-            []
-            [ Svg.g
-                [ Svg.Attributes.id screenId ]
-                (paths |> List.map viewPath)
+render ( width, height ) =
+    let
+        attributes =
+            [ Svg.Attributes.class "screen"
+            , Svg.Attributes.viewBox ([ 0, 0, width, height ] |> List.map String.fromFloat |> String.join " ")
+            , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
+            , Svg.Attributes.width "auto"
+            , Svg.Attributes.height "auto"
             ]
-        , Svg.g
-            []
-            (translations |> List.map (viewProjection width height))
-        ]
+
+        projections =
+            Svg.g
+                []
+                (translations |> List.map (viewProjection width height))
+    in
+    \paths ->
+        Svg.svg
+            attributes
+            [ Svg.defs
+                []
+                [ Svg.g
+                    [ Svg.Attributes.id screenId ]
+                    (paths |> List.map viewPath)
+                ]
+            , projections
+            ]
 
 
-viewPath : ( Float, Bool, List Point ) -> Svg a
-viewPath ( opacity, closed, points ) =
+viewPath : Path -> Svg a
+viewPath { opacity, closed, points } =
     Svg.node
         (if closed then
             "polygon"
+
          else
             "polyline"
         )
         [ Svg.Attributes.points (points |> pointsToString)
-        , Svg.Attributes.opacity (opacity |> toString)
+        , Svg.Attributes.opacity (opacity |> String.fromFloat)
         ]
         []
 
 
 pointsToString : List Point -> String
 pointsToString =
-    List.foldr
-        (pointToString >> (++) " " >> (++))
+    List.foldl
+        (\( x, y ) string ->
+            String.fromFloat x ++ "," ++ String.fromFloat y ++ " " ++ string
+        )
         ""
-
-
-pointToString : Point -> String
-pointToString ( x, y ) =
-    toString x ++ "," ++ toString y
 
 
 
@@ -72,9 +77,9 @@ pointToString ( x, y ) =
 viewProjection : Float -> Float -> ( Float, Float ) -> Svg a
 viewProjection width height ( u, v ) =
     Svg.svg
-        [ Svg.Attributes.width (width |> toString)
-        , Svg.Attributes.height (height |> toString)
-        , Svg.Attributes.viewBox ([ width * u, height * v, width, height ] |> List.map toString |> String.join " ")
+        [ Svg.Attributes.width (width |> String.fromFloat)
+        , Svg.Attributes.height (height |> String.fromFloat)
+        , Svg.Attributes.viewBox ([ width * u, height * v, width, height ] |> List.map String.fromFloat |> String.join " ")
         ]
         [ Svg.use [ Svg.Attributes.xlinkHref ("#" ++ screenId) ] []
         ]
@@ -82,10 +87,9 @@ viewProjection width height ( u, v ) =
 
 translations : List ( Float, Float )
 translations =
-    List.map (,) [ 0, 1, -1 ]
-        |> apply [ 0, 1, -1 ]
+    cross [ 0, 1, -1 ]
 
 
-apply : List a -> List (a -> b) -> List b
-apply =
-    List.concatMap << (flip List.map)
+cross : List a -> List ( a, a )
+cross list =
+    List.concatMap (\x -> List.map (\y -> ( x, y )) list) list

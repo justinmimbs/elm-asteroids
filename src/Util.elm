@@ -1,4 +1,4 @@
-module Util exposing (transformPoints, wrapPosition, floatModulo)
+module Util exposing (floatModulo, transformPoints, wrapPosition)
 
 import Geometry.Matrix as Matrix
 import Geometry.Vector exposing (Point)
@@ -32,4 +32,4 @@ floatModulo x y =
         n =
             x / y |> floor |> toFloat
     in
-        x - n * y
+    x - n * y

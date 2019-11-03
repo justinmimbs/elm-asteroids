@@ -1,41 +1,36 @@
 module Main exposing (main)
 
-import AnimationFrame
-import Html exposing (Html)
-import Html.Attributes
-import Keyboard
-import Random.Pcg as Random
-import Time exposing (Time)
-
-
--- project modules
-
 import Asteroid exposing (Asteroid)
+import Browser
+import Browser.Events
 import Font exposing (Font)
 import Font.Astraea as Astraea
 import Geometry.Vector as Vector exposing (Point)
+import Html exposing (Html)
+import Html.Attributes
+import Json.Decode as Decode exposing (Decoder)
 import Level exposing (Controls, Level)
 import PathData exposing (PathData)
+import Random
 import Screen
 import Static
-import Types exposing (Moving, Positioned, Polyline)
+import Types exposing (Moving, Polyline, Positioned)
 import Util exposing (transformPoints, wrapPosition)
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.program
-        { init = ( Random.initialSeed 3780540839 |> init, Cmd.none )
+    Browser.document
+        { init = \_ -> ( Random.initialSeed 3780540839 |> init, Cmd.none )
         , update = \msg model -> ( update msg model, Cmd.none )
         , view = view
         , subscriptions =
-            always
-                (Sub.batch
-                    [ Keyboard.downs (keyCodeToMsg True)
-                    , Keyboard.ups (keyCodeToMsg False)
-                    , AnimationFrame.diffs (Tick << Time.inSeconds)
+            \_ ->
+                Sub.batch
+                    [ Browser.Events.onKeyDown (decodeKeyEvent True)
+                    , Browser.Events.onKeyUp (decodeKeyEvent False)
+                    , Browser.Events.onAnimationFrameDelta (\millis -> Tick (millis / 1000))
                     ]
-                )
         }
 
 
@@ -54,6 +49,10 @@ type State
     | Playing Int Level Controls
     | Cleared Int Level Controls Time
     | Destroyed Int Level Time
+
+
+type alias Time =
+    Float
 
 
 screenSize : ( Float, Float )
@@ -75,9 +74,18 @@ initLevel n seed =
 
 levelSeed : Int -> Random.Seed -> Random.Seed
 levelSeed n =
-    Random.fastForward (n + 1)
+    fastForward (n + 1)
         >> Random.step Random.independentSeed
         >> Tuple.first
+
+
+fastForward : Int -> Random.Seed -> Random.Seed
+fastForward steps seed =
+    if steps <= 0 then
+        seed
+
+    else
+        fastForward (steps - 1) (Random.step (Random.constant ()) seed |> Tuple.second)
 
 
 
@@ -99,38 +107,55 @@ type Control
     | Shield
 
 
-keyCodeToMsg : Bool -> Int -> Msg
-keyCodeToMsg isPressed keyCode =
-    case keyCode of
-        -- enter
-        13 ->
+decodeKeyEvent : Bool -> Decoder Msg
+decodeKeyEvent isPressed =
+    Decode.field "key" Decode.string
+        |> Decode.andThen (keyToMsg isPressed >> decoderFromMaybe)
+
+
+decoderFromMaybe : Maybe a -> Decoder a
+decoderFromMaybe maybe =
+    case maybe of
+        Just x ->
+            Decode.succeed x
+
+        Nothing ->
+            Decode.fail "Nothing"
+
+
+keyToMsg : Bool -> String -> Maybe Msg
+keyToMsg isPressed key =
+    case key of
+        "Enter" ->
             if isPressed then
-                Start
+                Just Start
+
             else
-                NoOp
+                Nothing
 
-        -- left
-        37 ->
-            Input Left isPressed
+        "ArrowLeft" ->
+            Just <| Input Left isPressed
 
-        -- up
-        38 ->
-            Input Thrust isPressed
+        "ArrowUp" ->
+            Just <| Input Thrust isPressed
 
-        -- right
-        39 ->
-            Input Right isPressed
+        "ArrowRight" ->
+            Just <| Input Right isPressed
 
-        -- f
-        70 ->
-            Input Fire isPressed
+        "f" ->
+            Just <| Input Fire isPressed
 
-        -- s
-        83 ->
-            Input Shield isPressed
+        "F" ->
+            Just <| Input Fire isPressed
+
+        "s" ->
+            Just <| Input Shield isPressed
+
+        "S" ->
+            Just <| Input Shield isPressed
 
         _ ->
-            NoOp
+            Nothing
 
 
 update : Msg -> Model -> Model
@@ -169,6 +194,7 @@ update msg (( seed, state ) as model) =
                 LevelTitle n level timer ->
                     if timer > dt then
                         LevelTitle n (level |> Level.asteroidsUpdate dt) (timer - dt)
+
                     else
                         Playing n level Level.initialControls
 
@@ -186,16 +212,18 @@ update msg (( seed, state ) as model) =
                 Cleared n level controls timer ->
                     if timer > dt then
                         Cleared n (level |> Level.update dt controls |> Tuple.first) controls (timer - dt)
+
                     else
                         initLevel (n + 1) seed
 
                 Destroyed n level timer ->
                     if timer > dt then
                         Destroyed n (level |> Level.update dt Level.initialControls |> Tuple.first) (timer - dt)
+
                     else
                         initMainTitle seed
     )
-        |> (,) seed
+        |> Tuple.pair seed
 
 
 updateControls : Control -> Bool -> Controls -> Controls
@@ -229,7 +257,7 @@ updateMoving dt obj =
 -- view
 
 
-view : Model -> Html a
+view : Model -> Browser.Document a
 view ( _, state ) =
     case state of
         MainTitle asteroids ->
@@ -239,7 +267,7 @@ view ( _, state ) =
                 |> viewMain
 
         LevelTitle n level _ ->
-            ("LEVEL " ++ toString n |> typeset mediumFont (screenCenter |> Vector.add ( 0, 0.5 * mediumFont.height )))
+            ("LEVEL " ++ String.fromInt n |> typeset mediumFont (screenCenter |> Vector.add ( 0, 0.5 * mediumFont.height )))
                 ++ (level |> Level.asteroidsToPaths)
                 |> viewMain
 
@@ -249,6 +277,7 @@ view ( _, state ) =
         Cleared _ level _ timer ->
             if timer > 2 then
                 level |> Level.toPaths |> viewMain
+
             else
                 ("CLEARED" |> typeset mediumFont (screenCenter |> Vector.add ( 0, 0.5 * mediumFont.height )))
                     ++ (level |> Level.toPaths)
@@ -257,17 +286,18 @@ view ( _, state ) =
         Destroyed _ level timer ->
             if timer > 5 then
                 level |> Level.toPaths |> viewMain
+
             else
                 ("PRESS ENTER TO CONTINUE" |> typeset smallFont (screenCenter |> Vector.add ( 0, -2 * smallFont.height )))
-                    ++ (timer |> ceiling |> toString |> typeset mediumFont (screenCenter |> Vector.add ( 0, 1 * mediumFont.height )))
+                    ++ (timer |> ceiling |> String.fromInt |> typeset mediumFont (screenCenter |> Vector.add ( 0, 1 * mediumFont.height )))
                     ++ (level |> Level.toPaths)
                     |> viewMain
 
 
-viewMain : List Screen.Path -> Html a
+viewMain : List Screen.Path -> Browser.Document a
 viewMain paths =
-    Html.main_
-        []
+    Browser.Document
+        "Asteroids"
         [ Html.node "style"
             []
             [ Html.text "@import url(../app/style.css);"
@@ -275,7 +305,7 @@ viewMain paths =
         , Html.div
             [ Html.Attributes.class "screen-container"
             ]
-            [ paths |> Screen.render screenSize
+            [ paths |> render
             ]
         , Html.div
             [ Html.Attributes.class "instructions-container"
@@ -285,9 +315,14 @@ viewMain paths =
         ]
 
 
+render : List Screen.Path -> Html a
+render =
+    Screen.render screenSize
+
+
 asteroidToPath : Asteroid -> Screen.Path
 asteroidToPath { polygon, position, rotation } =
-    ( 0.5, True, polygon |> transformPoints position rotation )
+    Screen.Path 0.5 True (polygon |> transformPoints position rotation)
 
 
 screenCenter : Point
@@ -329,5 +364,5 @@ typeset font ( cx, cy ) text =
             , cy - font.height
             )
     in
-        Font.typesetLine (\x -> List.map (List.map (Vector.add ( x, oy )))) font ox text
-            |> List.concatMap (List.map ((,,) 1 False))
+    Font.typesetLine (\x -> List.map (List.map (Vector.add ( x, oy )))) font ox text
+        |> List.concatMap (List.map (Screen.Path 1 False))

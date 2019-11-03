@@ -1,21 +1,16 @@
-module Level exposing (Controls, initialControls, Level, Ending(..), init, update, toPaths, asteroidsUpdate, asteroidsToPaths)
-
-import Random.Pcg as Random exposing (Generator)
-import Time exposing (Time)
-
-
--- project modules
+module Level exposing (Controls, Ending(..), Level, asteroidsToPaths, asteroidsUpdate, init, initialControls, toPaths, update)
 
 import Asteroid exposing (Asteroid)
 import Geometry.Circle as Circle
-import Geometry.Line as Line exposing (Intersection(SegmentSegment))
+import Geometry.Line as Line exposing (Intersection(..))
 import Geometry.Polygon as Polygon exposing (Polygon)
-import Geometry.Vector as Vector exposing (Vector, Point)
+import Geometry.Vector as Vector exposing (Point, Vector)
 import Particle exposing (Particle)
-import Physics exposing (Movement, Collidable)
+import Physics exposing (Collidable, Movement)
+import Random exposing (Generator)
 import Screen
-import Types exposing (Radians, Polyline, Boundaried, Positioned, Moving, Expiring)
-import Util exposing (transformPoints, wrapPosition, floatModulo)
+import Types exposing (Boundaried, Expiring, Moving, Polyline, Positioned, Radians)
+import Util exposing (floatModulo, transformPoints, wrapPosition)
 
 
 type alias Controls =
@@ -92,6 +87,10 @@ type Ending
     | Destroyed
 
 
+type alias Time =
+    Float
+
+
 init : ( Float, Float ) -> Int -> Random.Seed -> Level
 init screenSize n seed =
     let
@@ -101,21 +100,21 @@ init screenSize n seed =
         ( asteroids, seedNext ) =
             seed |> Random.step (Asteroid.field screenSize 250 count)
     in
-        { screenSize = screenSize
-        , seed = seedNext
-        , asteroids = asteroids
-        , player =
-            Just
-                { position = screenSize |> Vector.scale 0.5
-                , rotation = 0
-                , velocity = Vector.zero
-                , angularVelocity = 0
-                , spaceship = spaceship0
-                , aux = Off
-                }
-        , blasts = []
-        , particles = []
-        }
+    { screenSize = screenSize
+    , seed = seedNext
+    , asteroids = asteroids
+    , player =
+        Just
+            { position = screenSize |> Vector.scale 0.5
+            , rotation = 0
+            , velocity = Vector.zero
+            , angularVelocity = 0
+            , spaceship = spaceship0
+            , aux = Off
+            }
+    , blasts = []
+    , particles = []
+    }
 
 
 spaceship0 : Spaceship
@@ -161,7 +160,7 @@ update dt controls model =
         blastsU =
             playerU
                 |> Maybe.andThen (fireBlast dt)
-                |> unwrap model.blasts ((flip (::)) model.blasts)
+                |> unwrap model.blasts (\blast -> blast :: model.blasts)
                 |> List.filterMap (updateBlast dt)
                 |> List.map wrapPosition_
 
@@ -183,22 +182,24 @@ update dt controls model =
         ( newParticles, seedNext ) =
             [ maybeParticles1, maybeParticles2, maybeParticles3 ]
                 |> List.foldl (appendMaybe (Random.map2 (++))) Nothing
-                |> unwrap ( [], model.seed ) ((flip Random.step) model.seed)
+                |> unwrap ( [], model.seed ) (\particles -> Random.step particles model.seed)
     in
-        ( { model
-            | asteroids = asteroidsI2
-            , player = Maybe.map playerFromPlayerC playerC2
-            , blasts = blastsI2
-            , particles = newParticles ++ particlesU
-            , seed = seedNext
-          }
-        , if isJust model.player && not (isJust playerC2) then
-            Just Destroyed
-          else if not (List.isEmpty model.asteroids) && List.isEmpty asteroidsI2 then
-            Just Cleared
-          else
-            Nothing
-        )
+    ( { model
+        | asteroids = asteroidsI2
+        , player = Maybe.map playerFromPlayerC playerC2
+        , blasts = blastsI2
+        , particles = newParticles ++ particlesU
+        , seed = seedNext
+      }
+    , if isJust model.player && not (isJust playerC2) then
+        Just Destroyed
+
+      else if not (List.isEmpty model.asteroids) && List.isEmpty asteroidsI2 then
+        Just Cleared
+
+      else
+        Nothing
+    )
 
 
 asteroidsUpdate : Time -> Level -> Level
@@ -216,12 +217,13 @@ fireBlast dt player =
             speed =
                 Vector.length player.velocity + 800
         in
-            { position = player.position
-            , velocity = ( speed, player.rotation + pi / -2 ) |> fromPolar
-            , timeRemaining = 1200 / speed
-            , deltaTime = dt
-            }
-                |> updateBlast dt
+        { position = player.position
+        , velocity = ( speed, player.rotation + pi / -2 ) |> fromPolar
+        , timeRemaining = 1200 / speed
+        , deltaTime = dt
+        }
+            |> updateBlast dt
+
     else
         Nothing
 
@@ -235,12 +237,13 @@ updateBlast dt blast =
                 , timeRemaining = blast.timeRemaining - dt
                 , deltaTime = dt
             }
+
     else
         Nothing
 
 
 playerSettings =
-    { turningSpeed = 1.6 -- rad / second
+    { turningSpeed = 1.4 -- rad / second
     , thrustSpeed = 35 -- px / second
     , positionFriction = 0.98
     , rotationFriction = 0.8
@@ -272,24 +275,26 @@ updatePlayer dt controls player =
         positionThrust =
             if controls.thrust then
                 ( thrustSpeed * dt, rotationNext + pi / -2 ) |> fromPolar
+
             else
                 Vector.zero
 
         positionNext =
             player.position
                 |> Vector.add (player.velocity |> Vector.scale (positionFriction * dt))
-                |> Vector.add (positionThrust)
+                |> Vector.add positionThrust
     in
-        if dt == 0 then
-            player
-        else
-            { player
-                | position = positionNext
-                , rotation = rotationNext
-                , velocity = Vector.sub positionNext player.position |> Vector.scale (1 / dt)
-                , angularVelocity = (rotationNext - player.rotation) / dt
-                , aux = player.aux |> updateAux dt controls
-            }
+    if dt == 0 then
+        player
+
+    else
+        { player
+            | position = positionNext
+            , rotation = rotationNext
+            , velocity = Vector.sub positionNext player.position |> Vector.scale (1 / dt)
+            , angularVelocity = (rotationNext - player.rotation) / dt
+            , aux = player.aux |> updateAux dt controls
+        }
 
 
 updateAux : Time -> Controls -> Aux -> Aux
@@ -322,8 +327,9 @@ updateCharge dt cycleTime charge =
         Charging t ->
             if t < 0.001 then
                 Charged
+
             else
-                (Charging (t - dt))
+                Charging (t - dt)
 
         Charged ->
             cycleTime |> unwrap Charged ((+) -dt >> Charging)
@@ -342,6 +348,7 @@ updateExpiring dt obj =
     if obj.timeRemaining > 0 then
         Just
             { obj | timeRemaining = obj.timeRemaining - dt }
+
     else
         Nothing
 
@@ -403,7 +410,7 @@ interactBlastAsteroid =
                                 fragment |> Circle.enclose
 
                             fragmentPolygon =
-                                fragment |> List.map ((flip Vector.sub) fragmentPosition)
+                                fragment |> List.map (\p -> Vector.sub p fragmentPosition)
 
                             forceVelocity =
                                 impact.blast.velocity |> Vector.normalize |> Vector.scale impact.forceSpeed
@@ -411,28 +418,29 @@ interactBlastAsteroid =
                             ( fragmentVelocity, fragmentAngularVelocity ) =
                                 Physics.impulse forceVelocity impact.point fragmentPosition
                         in
-                            if fragmentRadius < 18 then
-                                ( fragments
-                                , fragmentPolygon
-                                    |> Particle.explode impact.forceSpeed impact.forceSpeed
-                                    |> Random.map (List.map (adjustParticle fragmentPosition fragmentVelocity))
-                                    |> Random.map2 (++) particles
-                                )
-                            else
-                                ( { polygon = fragmentPolygon
-                                  , radius = fragmentRadius
-                                  , position = fragmentPosition
-                                  , rotation = 0
-                                  , velocity =
-                                        Vector.interpolate (fragmentRadius ^ 2 / asteroid.radius ^ 2)
-                                            (Vector.direction asteroid.position fragmentPosition |> Vector.scale impact.forceSpeed)
-                                            asteroid.velocity
-                                            |> Vector.add fragmentVelocity
-                                  , angularVelocity = asteroid.angularVelocity + fragmentAngularVelocity
-                                  }
-                                    :: fragments
-                                , particles
-                                )
+                        if fragmentRadius < 18 then
+                            ( fragments
+                            , fragmentPolygon
+                                |> Particle.explode impact.forceSpeed impact.forceSpeed
+                                |> Random.map (List.map (adjustParticle fragmentPosition fragmentVelocity))
+                                |> Random.map2 (++) particles
+                            )
+
+                        else
+                            ( { polygon = fragmentPolygon
+                              , radius = fragmentRadius
+                              , position = fragmentPosition
+                              , rotation = 0
+                              , velocity =
+                                    Vector.interpolate (fragmentRadius ^ 2 / asteroid.radius ^ 2)
+                                        (Vector.direction asteroid.position fragmentPosition |> Vector.scale impact.forceSpeed)
+                                        asteroid.velocity
+                                        |> Vector.add fragmentVelocity
+                              , angularVelocity = asteroid.angularVelocity + fragmentAngularVelocity
+                              }
+                                :: fragments
+                            , particles
+                            )
                     )
                     ( [], impact.particles )
         )
@@ -477,6 +485,7 @@ interactBlastPlayer =
                     |> Just
                 , impact.particles
                 )
+
             else
                 ( Nothing
                 , player
@@ -492,8 +501,8 @@ explodePlayer speed player =
     Random.map2 (++)
         -- spaceship pieces
         (Random.map2 (++)
-            (Particle.explode speed speed (player.spaceship.hull))
-            (Particle.explode speed speed (player.spaceship.interior))
+            (Particle.explode speed speed player.spaceship.hull)
+            (Particle.explode speed speed player.spaceship.interior)
             |> Random.map (List.map (adjustParticle player.position player.velocity))
         )
         -- burst
@@ -538,12 +547,13 @@ interactAsteroidPlayer asteroid player =
                         t =
                             player.radius ^ 2 / (player.radius ^ 2 + asteroid.radius ^ 2)
                     in
-                        ( asteroid |> setMovement aMovement
-                        , { player | aux = Shielding (Charging (burstSpeed * 0.002)) } |> setMovement pMovement |> Just
-                        , Particle.burst burstSpeed (burstSpeed * 0.2) (sqrt burstSpeed * 0.5 |> ceiling)
-                            |> Random.map (List.map (adjustParticle contactPoint (Vector.interpolate t asteroid.velocity player.velocity)))
-                        )
+                    ( asteroid |> setMovement aMovement
+                    , { player | aux = Shielding (Charging (burstSpeed * 0.002)) } |> setMovement pMovement |> Just
+                    , Particle.burst burstSpeed (burstSpeed * 0.2) (sqrt burstSpeed * 0.5 |> ceiling)
+                        |> Random.map (List.map (adjustParticle contactPoint (Vector.interpolate t asteroid.velocity player.velocity)))
+                    )
                 )
+
     else
         Physics.collide 0.2 asteroid player
             |> Maybe.map
@@ -579,6 +589,7 @@ playerToPlayerC player =
     , polygon =
         if player.aux == Shielding Charged then
             player.spaceship.shield
+
         else
             player.spaceship.hull
     }
@@ -617,21 +628,22 @@ interactBlastCollidable f blast obj =
             ( a, b ) =
                 ( blast |> blastTrailPosition, blast.position )
         in
-            impactPoint a b objPolygon
-                |> Maybe.map
-                    (\point ->
-                        f
-                            { blast = blast
-                            , point = point
-                            , forceSpeed =
-                                (blast.velocity |> Vector.length)
-                                    * (blastMass / (blastMass + obj.radius ^ 2))
-                            , particles =
-                                Particle.burst 100 50 (obj.radius / 4 |> ceiling)
-                                    |> Random.map (List.map (adjustParticle point obj.velocity))
-                            }
-                            obj
-                    )
+        impactPoint a b objPolygon
+            |> Maybe.map
+                (\point ->
+                    f
+                        { blast = blast
+                        , point = point
+                        , forceSpeed =
+                            (blast.velocity |> Vector.length)
+                                * (blastMass / (blastMass + obj.radius ^ 2))
+                        , particles =
+                            Particle.burst 100 50 (obj.radius / 4 |> ceiling)
+                                |> Random.map (List.map (adjustParticle point obj.velocity))
+                        }
+                        obj
+                )
+
     else
         Nothing
 
@@ -659,10 +671,10 @@ impactPoint a b polygon =
             Just p
 
         [ p, q ] ->
-            Just ((a < b |> either min max) p q)
+            Just ((a < b |> bool min max) p q)
 
         points ->
-            (a < b |> either List.minimum List.maximum) points
+            (a < b |> bool List.minimum List.maximum) points
 
 
 
@@ -696,7 +708,7 @@ toPaths { asteroids, player, blasts, particles } =
     , player
         |> unwrap [] playerToPaths
     , blasts
-        |> List.map (blastToLine >> (,,) 1 False)
+        |> List.map (blastToLine >> Screen.Path 1 False)
     , particles
         |> List.map particleToPath
     ]
@@ -710,7 +722,7 @@ asteroidsToPaths =
 
 asteroidToPath : Asteroid -> Screen.Path
 asteroidToPath =
-    transformPolygon >> (,,) 0.5 True
+    transformPolygon >> Screen.Path 0.5 True
 
 
 playerToPaths : Player -> List Screen.Path
@@ -718,23 +730,26 @@ playerToPaths { position, rotation, spaceship, aux } =
     let
         transform =
             transformPoints position rotation
+
+        spaceshipPaths =
+            [ Screen.Path 1 True (spaceship.hull |> transform)
+            , Screen.Path 1 False (spaceship.interior |> transform)
+            ]
     in
-        [ ( 1, True, spaceship.hull |> transform )
-        , ( 1, False, spaceship.interior |> transform )
-        ]
-            |> (if aux == Shielding Charged then
-                    (::) ( 1, True, spaceship.shield |> transform )
-                else
-                    identity
-               )
+    if aux == Shielding Charged then
+        Screen.Path 1 True (spaceship.shield |> transform)
+            :: spaceshipPaths
+
+    else
+        spaceshipPaths
 
 
 particleToPath : Particle -> Screen.Path
 particleToPath { polyline, position, rotation } =
-    ( abs (0.5 - floatModulo (rotation / pi) 1) + 0.5
-    , False
-    , polyline |> transformPoints position rotation
-    )
+    Screen.Path
+        (abs (0.5 - floatModulo (rotation / pi) 1) + 0.5)
+        False
+        (polyline |> transformPoints position rotation)
 
 
 transformPolygon : Positioned { a | polygon : Polygon } -> Polygon
@@ -758,15 +773,11 @@ blastToLine blast =
 -- helpers
 
 
-(>>>) : (a -> b -> c) -> (c -> d) -> a -> b -> d
-(>>>) f g x y =
-    g (f x y)
-
-
-either : a -> a -> Bool -> a
-either t f x =
+bool : a -> a -> Bool -> a
+bool t f x =
     if x then
         t
+
     else
         f
 

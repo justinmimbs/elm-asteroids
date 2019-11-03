@@ -1,4 +1,4 @@
-module Geometry.Line exposing (midpoint, perpendicularBisector, Intersection(..), intersect)
+module Geometry.Line exposing (Intersection(..), intersect, midpoint, perpendicularBisector)
 
 import Geometry.Vector exposing (Point)
 
@@ -16,7 +16,7 @@ perpendicularBisector (( ax, ay ) as a) (( bx, by ) as b) =
         (( mx, my ) as m) =
             midpoint a b
     in
-        ( m, ( mx + (by - ay), my - (bx - ax) ) )
+    ( m, ( mx + (by - ay), my - (bx - ax) ) )
 
 
 
@@ -49,29 +49,33 @@ intersect intersection ( ax, ay ) ( bx, by ) ( cx, cy ) ( dx, dy ) =
             -- cross e r / rs
             (ex * ry - rx * ey) / rs
     in
-        if rs /= 0 then
-            case intersection of
-                LineLine ->
+    if rs /= 0 then
+        case intersection of
+            LineLine ->
+                Just ( cx + u * sx, cy + u * sy )
+
+            LineSegment ->
+                if 0 <= u && u <= 1 then
                     Just ( cx + u * sx, cy + u * sy )
 
-                LineSegment ->
-                    if 0 <= u && u <= 1 then
+                else
+                    Nothing
+
+            SegmentSegment ->
+                if 0 <= u && u <= 1 then
+                    let
+                        t =
+                            -- cross e s / rs
+                            (ex * sy - sx * ey) / rs
+                    in
+                    if 0 <= t && t <= 1 then
                         Just ( cx + u * sx, cy + u * sy )
+
                     else
                         Nothing
 
-                SegmentSegment ->
-                    if 0 <= u && u <= 1 then
-                        let
-                            t =
-                                -- cross e s / rs
-                                (ex * sy - sx * ey) / rs
-                        in
-                            if 0 <= t && t <= 1 then
-                                Just ( cx + u * sx, cy + u * sy )
-                            else
-                                Nothing
-                    else
-                        Nothing
-        else
-            Nothing
+                else
+                    Nothing
+
+    else
+        Nothing
