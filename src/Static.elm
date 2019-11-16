@@ -30,8 +30,8 @@ instructions =
         [ Svg.Attributes.class "instructions"
         , Svg.Attributes.viewBox ([ 0, 0, sectionWidth * (List.length sections + 2), 180 ] |> List.map String.fromInt |> String.join " ")
         , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
-        , Svg.Attributes.width "auto"
-        , Svg.Attributes.height "auto"
+        , Svg.Attributes.width "100%"
+        , Svg.Attributes.height "100%"
         ]
         (sections
             |> List.indexedMap

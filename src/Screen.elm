@@ -24,8 +24,6 @@ render ( width, height ) =
             [ Svg.Attributes.class "screen"
             , Svg.Attributes.viewBox ([ 0, 0, width, height ] |> List.map String.fromFloat |> String.join " ")
             , Svg.Attributes.preserveAspectRatio "xMidYMin meet"
-            , Svg.Attributes.width "auto"
-            , Svg.Attributes.height "auto"
             ]
 
         projections =

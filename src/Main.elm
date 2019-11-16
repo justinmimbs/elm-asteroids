@@ -302,15 +302,18 @@ viewMain paths =
             []
             [ Html.text "@import url(../app/style.css);"
             ]
-        , Html.div
-            [ Html.Attributes.class "screen-container"
-            ]
-            [ paths |> render
-            ]
-        , Html.div
-            [ Html.Attributes.class "instructions-container"
-            ]
-            [ Static.instructions
+        , Html.main_
+            []
+            [ Html.div
+                [ Html.Attributes.class "screen-container"
+                ]
+                [ paths |> render
+                ]
+            , Html.div
+                [ Html.Attributes.class "instructions-container"
+                ]
+                [ Static.instructions
+                ]
             ]
         ]
 
