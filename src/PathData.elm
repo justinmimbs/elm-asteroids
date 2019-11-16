@@ -33,31 +33,25 @@ commandToString command =
         |> String.join " "
 
 
-bezierToPolyline : Float -> List Point -> List Point
-bezierToPolyline segmentLength controlPoints =
+cubicBezierToPolyline : Float -> Point -> Point -> Point -> Point -> List Point
+cubicBezierToPolyline segmentLength p1 p2 p3 p4 =
     let
         hullLength =
-            controlPoints |> foldPairs (\a b length -> Vector.distance a b + length) 0
+            Vector.distance p1 p2 + Vector.distance p2 p3 + Vector.distance p3 p4
 
         n =
             hullLength / segmentLength |> ceiling
     in
-    List.range 0 n
-        |> List.map
-            (\i -> pointOnBezier (toFloat i / toFloat n) controlPoints)
+    List.map
+        (\i -> cubicBezierPoint (toFloat i / toFloat n) p1 p2 p3 p4)
+        (List.range 0 n)
 
 
-pointOnBezier : Float -> List Point -> Point
-pointOnBezier t controlPoints =
-    case controlPoints of
-        [] ->
-            Vector.zero
-
-        [ p ] ->
-            p
-
-        _ ->
-            pointOnBezier t (mapPairs (Vector.interpolate t) controlPoints)
+cubicBezierPoint : Float -> Point -> Point -> Point -> Point -> Point
+cubicBezierPoint t ( x1, y1 ) ( x2, y2 ) ( x3, y3 ) ( x4, y4 ) =
+    ( (1 - t) ^ 3 * x1 + 3 * (1 - t) ^ 2 * t * x2 + 3 * (1 - t) * t ^ 2 * x3 + t ^ 3 * x4
+    , (1 - t) ^ 3 * y1 + 3 * (1 - t) ^ 2 * t * y2 + 3 * (1 - t) * t ^ 2 * y3 + t ^ 3 * y4
+    )
 
 
 toPolylines : Float -> PathData -> List (List Point)
@@ -72,7 +66,7 @@ toPolylines segmentLength =
                     (( x, y ) :: polyline) :: rest
 
                 ( C a b c d x y, (p :: polyline) :: rest ) ->
-                    (bezierToPolyline segmentLength [ ( x, y ), ( c, d ), ( a, b ), p ] ++ polyline) :: rest
+                    (cubicBezierToPolyline segmentLength ( x, y ) ( c, d ) ( a, b ) p ++ polyline) :: rest
 
                 _ ->
                     result
@@ -135,25 +129,3 @@ lineTo ( x, y ) =
 cubicTo : Point -> Point -> Point -> Command
 cubicTo ( a, b ) ( c, d ) ( x, y ) =
     C a b c d x y
-
-
-
--- List helpers
-
-
-foldPairs : (a -> a -> b -> b) -> b -> List a -> b
-foldPairs f result list =
-    case list of
-        x :: ((y :: _) as rest) ->
-            foldPairs f (f x y result) rest
-
-        _ ->
-            result
-
-
-{-| Combine each pair of consecutive elements; the resulting list's length
-will be one less than the given list.
--}
-mapPairs : (a -> a -> b) -> List a -> List b
-mapPairs f =
-    foldPairs (\x y r -> f x y :: r) [] >> List.reverse
