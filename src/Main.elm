@@ -298,11 +298,7 @@ viewMain : List Screen.Path -> Browser.Document a
 viewMain paths =
     Browser.Document
         "Asteroids"
-        [ Html.node "style"
-            []
-            [ Html.text "@import url(../app/style.css);"
-            ]
-        , Html.main_
+        [ Html.main_
             []
             [ Html.div
                 [ Html.Attributes.class "screen-container"
