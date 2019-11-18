@@ -1,17 +1,13 @@
 module Main exposing (main)
 
 import Dict exposing (Dict)
-import Html exposing (Html)
-import Svg exposing (Svg)
-import Svg.Attributes
-
-
--- project
-
 import Font exposing (Font)
 import Font.Astraea as Astraea
 import Geometry.Vector as Vector exposing (Point)
+import Html exposing (Html)
 import PathData exposing (PathData)
+import Svg exposing (Svg)
+import Svg.Attributes
 
 
 astraeaPathData =
@@ -105,10 +101,10 @@ viewSample pxSize text =
                 |> Dict.get pxSize
                 |> Maybe.withDefault ( astraeaPathData.p16, astraeaPolylines.p16 )
     in
-        [ Font.typesetLine ((flip (,)) 0 >> viewPath) fontPathData 0
-        , Font.typesetLine (\x p -> p |> List.map (viewPolyline ( x, toFloat pxSize * 1.5 ))) fontPolylines 0 >> List.concat
-        ]
-            |> List.concatMap ((|>) (toString pxSize ++ " " ++ text))
+    [ Font.typesetLine (\x p -> viewPath ( x, 0 ) p) fontPathData 0
+    , Font.typesetLine (\x p -> p |> List.map (viewPolyline ( x, toFloat pxSize * 1.5 ))) fontPolylines 0 >> List.concat
+    ]
+        |> List.concatMap ((|>) (String.fromInt pxSize ++ " " ++ text))
 
 
 viewPath : Point -> PathData -> Svg a
@@ -135,4 +131,4 @@ viewPolyline offset points =
 
 pointToString : Point -> String
 pointToString ( x, y ) =
-    toString x ++ ", " ++ toString y
+    String.fromFloat x ++ ", " ++ String.fromFloat y
