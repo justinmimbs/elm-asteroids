@@ -1,43 +1,43 @@
 module Main exposing (main)
 
-import AnimationFrame
+import Asteroid exposing (Asteroid)
+import Browser
+import Browser.Events
+import Geometry.Vector as Vector
 import Html exposing (Html)
 import Html.Attributes
-import Random.Pcg as Random
-import Time exposing (Time)
-
-
--- project modules
-
-import Asteroid exposing (Asteroid)
-import Geometry.Vector as Vector
-import Util exposing (transformPoints, wrapPosition)
+import Random
 import Screen
-import Types exposing (Moving, Positioned)
+import Types exposing (Moving, Positioned, Time)
+import Util exposing (transformPoints, wrapPosition)
 
 
-main : Program Never (List Asteroid) Time
+main : Program () (List Asteroid) Time
 main =
-    Html.program
-        { init = ( initField, Cmd.none )
+    Browser.element
+        { init = \_ -> ( initField, Cmd.none )
         , update = \x r -> ( update x r, Cmd.none )
         , view = List.map asteroidToPath >> Screen.render screenSize >> viewContainer
-        , subscriptions = always (AnimationFrame.diffs Time.inSeconds)
+        , subscriptions = always (Browser.Events.onAnimationFrameDelta (\ms -> ms / 1000))
         }
 
 
 viewContainer : Html a -> Html a
-viewContainer content =
-    Html.div
-        [ Html.Attributes.style
-            [ ( "height", "100vh" )
-            , ( "fill", "none" )
-            , ( "stroke", "gray" )
-            , ( "stroke-width", "2px" )
-            ]
-        ]
-        [ content
-        ]
+viewContainer =
+    let
+        ( width, height ) =
+            screenSize
+
+        container =
+            Html.div
+                [ Html.Attributes.style "width" (String.fromFloat width ++ "px")
+                , Html.Attributes.style "height" (String.fromFloat height ++ "px")
+                , Html.Attributes.style "fill" "none"
+                , Html.Attributes.style "stroke" "gray"
+                , Html.Attributes.style "stroke-width" "2px"
+                ]
+    in
+    \content -> container [ content ]
 
 
 update : Time -> List Asteroid -> List Asteroid
@@ -57,7 +57,7 @@ updateMoving dt obj =
 initField : List Asteroid
 initField =
     Random.initialSeed 3780540833
-        |> Random.step (Asteroid.field ( 1200, 900 ) 200 10)
+        |> Random.step (Asteroid.field screenSize 200 24)
         |> Tuple.first
 
 
@@ -68,4 +68,4 @@ screenSize =
 
 asteroidToPath : Asteroid -> Screen.Path
 asteroidToPath { polygon, position, rotation } =
-    ( 1, True, polygon |> transformPoints position rotation )
+    Screen.Path 1 True (polygon |> transformPoints position rotation)

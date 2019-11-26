@@ -1,56 +1,56 @@
 module Main exposing (main)
 
-import AnimationFrame
+import Browser
+import Browser.Events
+import Geometry.Polygon as Polygon exposing (Polygon)
+import Geometry.Vector as Vector exposing (Point, Vector)
 import Html exposing (Html)
 import Html.Attributes
-import Mouse
-import Time exposing (Time)
-
-
--- project modules
-
-import Geometry.Polygon as Polygon exposing (Polygon)
-import Geometry.Vector as Vector exposing (Vector, Point)
-import Physics exposing (Movement, Collidable)
+import Json.Decode
+import Physics exposing (Collidable, Movement)
 import Screen
-import Types exposing (Moving, Positioned, Radians)
+import Types exposing (Moving, Positioned, Radians, Time)
 import Util exposing (transformPoints, wrapPosition)
 
 
-main : Program Never (List (List Disk)) Msg
+main : Program () (List (List Disk)) Msg
 main =
-    Html.program
-        { init = ( init, Cmd.none )
+    Browser.element
+        { init = \_ -> ( init, Cmd.none )
         , update = \x r -> ( update x r, Cmd.none )
         , view =
             List.head
                 >> Maybe.map
-                    (List.map (transformPolygon >> (,,) 1 True)
+                    (List.map (transformPolygon >> Screen.Path 1 True)
                         >> Screen.render screenSize
                         >> viewContainer
                     )
                 >> Maybe.withDefault (Html.text "")
         , subscriptions =
             Sub.batch
-                [ AnimationFrame.diffs (Tick << Time.inSeconds)
-                , Mouse.downs (always Next)
+                [ Browser.Events.onAnimationFrameDelta (\ms -> Tick (ms / 1000))
+                , Browser.Events.onMouseDown (Json.Decode.succeed Next)
                 ]
                 |> always
         }
 
 
 viewContainer : Html a -> Html a
-viewContainer content =
-    Html.div
-        [ Html.Attributes.style
-            [ ( "height", "100vh" )
-            , ( "fill", "none" )
-            , ( "stroke", "gray" )
-            , ( "stroke-width", "2px" )
-            ]
-        ]
-        [ content
-        ]
+viewContainer =
+    let
+        ( width, height ) =
+            screenSize
+
+        container =
+            Html.div
+                [ Html.Attributes.style "width" (String.fromFloat width ++ "px")
+                , Html.Attributes.style "height" (String.fromFloat height ++ "px")
+                , Html.Attributes.style "fill" "none"
+                , Html.Attributes.style "stroke" "gray"
+                , Html.Attributes.style "stroke-width" "2px"
+                ]
+    in
+    \content -> container [ content ]
 
 
 init : List (List Disk)
@@ -83,9 +83,9 @@ init =
               ]
             ]
     in
-        List.map (toPair 50 50) pairs
-            ++ List.map (toPair 30 50) pairs
-            ++ List.map (toPair 50 30) pairs
+    List.map (toPair 50 50) pairs
+        ++ List.map (toPair 30 50) pairs
+        ++ List.map (toPair 50 30) pairs
 
 
 toPair : Float -> Float -> List (Float -> Disk) -> List Disk
