@@ -1,24 +1,20 @@
 module Main exposing (main)
 
-import AnimationFrame
+import Browser
+import Browser.Events
+import Geometry.Polygon as Polygon exposing (Polygon)
+import Geometry.Vector as Vector exposing (Point, Vector)
 import Html exposing (Html)
 import Html.Attributes
 import Json.Decode exposing (Decoder)
-import Random.Pcg as Random exposing (Generator)
+import Particle exposing (Particle)
+import Random exposing (Generator)
+import Screen
 import Svg exposing (Svg)
 import Svg.Attributes
 import Svg.Events
-import Time exposing (Time)
-
-
--- project
-
-import Geometry.Polygon as Polygon exposing (Polygon)
-import Geometry.Vector as Vector exposing (Vector, Point)
+import Types exposing (Expiring, Moving, Positioned, Time)
 import Util exposing (transformPoints, wrapPosition)
-import Particle exposing (Particle)
-import Screen
-import Types exposing (Moving, Expiring, Positioned)
 
 
 type alias Model =
@@ -29,20 +25,21 @@ type alias Model =
     }
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.program
+    Browser.element
         { init =
-            ( { drag = Nothing
-              , seed = Random.initialSeed 3780540833
-              , particles = []
-              , polygon = Polygon.ngon 5 |> List.map (Vector.scale 10)
-              }
-            , Cmd.none
-            )
+            \_ ->
+                ( { drag = Nothing
+                  , seed = Random.initialSeed 3780540833
+                  , particles = []
+                  , polygon = Polygon.ngon 5 |> List.map (Vector.scale 10)
+                  }
+                , Cmd.none
+                )
         , update = \x r -> ( update x r, Cmd.none )
         , view = view
-        , subscriptions = always (AnimationFrame.diffs (Time.inSeconds >> Tick))
+        , subscriptions = always (Browser.Events.onAnimationFrameDelta (\ms -> Tick (ms / 1000)))
         }
 
 
@@ -76,23 +73,25 @@ update msg model =
                 Just ( p0, p1 ) ->
                     let
                         ( particles, seedNext ) =
-                            Random.map
-                                (\( burst, polygonParts ) ->
-                                    burst
-                                        ++ polygonParts
-                                        |> List.map (adjustParticle p1 (Vector.sub p1 p0))
+                            Random.step
+                                (Random.map
+                                    (\( burst, polygonParts ) ->
+                                        burst
+                                            ++ polygonParts
+                                            |> List.map (adjustParticle p1 (Vector.sub p1 p0))
+                                    )
+                                    (Random.pair
+                                        (Particle.burst 300 100 10)
+                                        (Particle.explode 100 150 model.polygon)
+                                    )
                                 )
-                                (Random.pair
-                                    (Particle.burst 300 100 10)
-                                    (Particle.explode 100 150 model.polygon)
-                                )
-                                |> (flip Random.step) model.seed
+                                model.seed
                     in
-                        { model
-                            | drag = Nothing
-                            , seed = seedNext
-                            , particles = model.particles ++ particles
-                        }
+                    { model
+                        | drag = Nothing
+                        , seed = seedNext
+                        , particles = model.particles ++ particles
+                    }
 
                 Nothing ->
                     model
@@ -127,6 +126,7 @@ updateExpiring dt obj =
     if obj.timeRemaining > 0 then
         Just
             { obj | timeRemaining = obj.timeRemaining - dt }
+
     else
         Nothing
 
@@ -140,13 +140,12 @@ screenSize =
     ( 1200, 900 )
 
 
-( width, height ) =
-    screenSize
-
-
 view : Model -> Html Msg
 view { drag, particles, polygon } =
     let
+        ( width, height ) =
+            screenSize
+
         attributes =
             [ Svg.Attributes.width (width |> px)
             , Svg.Attributes.height (height |> px)
@@ -162,29 +161,27 @@ view { drag, particles, polygon } =
         paths : List Screen.Path
         paths =
             List.concat
-                [ drag |> Maybe.map (\( _, p1 ) -> polygon |> List.map (Vector.add p1) |> (,,) 1 True) |> listFromMaybe
+                [ drag |> Maybe.map (\( _, p1 ) -> polygon |> List.map (Vector.add p1) |> Screen.Path 1 True) |> listFromMaybe
                 , particles |> List.map particleToPath
                 ]
     in
-        Html.div
-            [ Html.Attributes.style
-                [ ( "height", "100vh" )
-                , ( "fill", "none" )
-                , ( "stroke", "gray" )
-                , ( "stroke-width", "2px" )
-                ]
+    Html.div
+        [ Html.Attributes.style "height" "100vh"
+        , Html.Attributes.style "fill" "none"
+        , Html.Attributes.style "stroke" "gray"
+        , Html.Attributes.style "stroke-width" "2px"
+        ]
+        [ Svg.svg
+            (attributes ++ events)
+            [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
+            , paths |> Screen.render screenSize
             ]
-            [ Svg.svg
-                (attributes ++ events)
-                [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
-                , paths |> Screen.render screenSize
-                ]
-            ]
+        ]
 
 
 particleToPath : Particle -> Screen.Path
 particleToPath { polyline, position, rotation } =
-    ( 1, False, polyline |> transformPoints position rotation )
+    Screen.Path 1 False (polyline |> transformPoints position rotation)
 
 
 viewLine : ( Point, Point ) -> Svg a
@@ -200,8 +197,8 @@ viewLine ( ( x1, y1 ), ( x2, y2 ) ) =
 
 
 px : Float -> String
-px =
-    toString >> (++) >> (|>) "px"
+px n =
+    String.fromFloat n ++ "px"
 
 
 
@@ -226,7 +223,7 @@ mousemove =
 decodeMouseOffset : Decoder Point
 decodeMouseOffset =
     Json.Decode.map2
-        (,)
+        Tuple.pair
         (Json.Decode.field "offsetX" Json.Decode.float)
         (Json.Decode.field "offsetY" Json.Decode.float)
 

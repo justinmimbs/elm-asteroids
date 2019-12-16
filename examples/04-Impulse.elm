@@ -1,22 +1,18 @@
 module Main exposing (main)
 
-import AnimationFrame
+import Browser
+import Browser.Events
+import Geometry.Polygon as Polygon exposing (Polygon)
+import Geometry.Vector as Vector exposing (Point, Vector)
 import Html exposing (Html)
 import Html.Attributes
 import Json.Decode exposing (Decoder)
+import Physics exposing (Movement)
+import Screen
 import Svg exposing (Svg)
 import Svg.Attributes
 import Svg.Events
-import Time exposing (Time)
-
-
--- project
-
-import Geometry.Polygon as Polygon exposing (Polygon)
-import Geometry.Vector as Vector exposing (Vector, Point)
-import Physics exposing (Movement)
-import Screen
-import Types exposing (Moving, Positioned, Radians)
+import Types exposing (Moving, Positioned, Radians, Time)
 import Util exposing (transformPoints, wrapPosition)
 
 
@@ -26,18 +22,19 @@ type alias Model =
     }
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.program
+    Browser.element
         { init =
-            ( { drag = Nothing
-              , disk = toDisk 50 12 ( 600, 450 ) 0 Vector.zero 0
-              }
-            , Cmd.none
-            )
+            \_ ->
+                ( { drag = Nothing
+                  , disk = toDisk 50 12 ( 600, 450 ) 0 Vector.zero 0
+                  }
+                , Cmd.none
+                )
         , update = \x r -> ( update x r, Cmd.none )
         , view = view
-        , subscriptions = always (AnimationFrame.diffs (Time.inSeconds >> Tick))
+        , subscriptions = always (Browser.Events.onAnimationFrameDelta (\ms -> Tick (ms / 1000)))
         }
 
 
@@ -118,13 +115,12 @@ screenSize =
     ( 1200, 900 )
 
 
-( width, height ) =
-    screenSize
-
-
 view : Model -> Html Msg
 view { drag, disk } =
     let
+        ( width, height ) =
+            screenSize
+
         attributes =
             [ Svg.Attributes.width (width |> px)
             , Svg.Attributes.height (height |> px)
@@ -139,22 +135,20 @@ view { drag, disk } =
 
         paths : List Screen.Path
         paths =
-            [ disk |> transformPolygon |> (,,) 1 True ]
+            [ disk |> transformPolygon |> Screen.Path 1 True ]
     in
-        Html.div
-            [ Html.Attributes.style
-                [ ( "height", "100vh" )
-                , ( "fill", "none" )
-                , ( "stroke", "gray" )
-                , ( "stroke-width", "2px" )
-                ]
+    Html.div
+        [ Html.Attributes.style "height" "100vh"
+        , Html.Attributes.style "fill" "none"
+        , Html.Attributes.style "stroke" "gray"
+        , Html.Attributes.style "stroke-width" "2px"
+        ]
+        [ Svg.svg
+            (attributes ++ events)
+            [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
+            , paths |> Screen.render screenSize
             ]
-            [ Svg.svg
-                (attributes ++ events)
-                [ drag |> Maybe.map viewLine |> Maybe.withDefault (Svg.g [] [])
-                , paths |> Screen.render screenSize
-                ]
-            ]
+        ]
 
 
 viewLine : ( Point, Point ) -> Svg a
@@ -170,8 +164,8 @@ viewLine ( ( x1, y1 ), ( x2, y2 ) ) =
 
 
 px : Float -> String
-px =
-    toString >> (++) >> (|>) "px"
+px n =
+    String.fromFloat n ++ "px"
 
 
 transformPolygon : Positioned { a | polygon : Polygon } -> Polygon
@@ -201,6 +195,6 @@ mousemove =
 decodeMouseOffset : Decoder Point
 decodeMouseOffset =
     Json.Decode.map2
-        (,)
+        Tuple.pair
         (Json.Decode.field "offsetX" Json.Decode.float)
         (Json.Decode.field "offsetY" Json.Decode.float)
