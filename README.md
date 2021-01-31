@@ -1,6 +1,6 @@
 # Asteroids
 
-[Play Asteroids!](https://justinmimbs.github.io/asteroids/)
+[Play Asteroids!](https://justinmimbs.github.io/elm-asteroids/)
 
 ![Asteroids](http://justinmimbs.com/etcetera/asteroids.png)
 
